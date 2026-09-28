@@ -1,7 +1,7 @@
 const { getUserCommunityAuthorization } = require('../modules/authorization/authorization.service');
 
 function getCommunityId(req) {
-  return req.params.communityId || req.body.communityId || req.query.communityId;
+  return req.params?.communityId || req.body?.communityId || req.query?.communityId;
 }
 
 function requirePermission(permission) {
