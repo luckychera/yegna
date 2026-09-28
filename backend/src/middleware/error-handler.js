@@ -1,4 +1,4 @@
-function errorHandler(error, req, res, next) {
+function errorHandler(error, req, res) {
   console.error(error);
 
   const statusCode = error.statusCode || 500;
