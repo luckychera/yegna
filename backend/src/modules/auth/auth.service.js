@@ -184,10 +184,87 @@ async function registerUser({
   }
 }
 
+async function loginUser({ identifier, password }) {
+  const result = await pool.query(
+    `
+      SELECT
+        id,
+        email,
+        phone,
+        password_hash,
+        status,
+        created_at
+      FROM users
+      WHERE deleted_at IS NULL
+        AND (
+          LOWER(email) = LOWER($1)
+          OR phone = $1
+        )
+      LIMIT 1;
+    `,
+    [identifier],
+  );
+
+  const user = result.rows[0];
+
+  if (!user) {
+    const error = new Error('Invalid email/phone or password');
+
+    error.statusCode = 401;
+    error.code = 'INVALID_CREDENTIALS';
+
+    throw error;
+  }
+
+  const passwordMatches = await comparePassword(password, user.password_hash);
+
+  if (!passwordMatches) {
+    const error = new Error('Invalid email/phone or password');
+
+    error.statusCode = 401;
+    error.code = 'INVALID_CREDENTIALS';
+
+    throw error;
+  }
+
+  if (user.status !== 'active') {
+    const error = new Error('Account is not active');
+
+    error.statusCode = 403;
+    error.code = 'ACCOUNT_NOT_ACTIVE';
+
+    throw error;
+  }
+
+  await pool.query(
+    `
+      UPDATE users
+      SET last_login_at = NOW(),
+          updated_at = NOW()
+      WHERE id = $1;
+    `,
+    [user.id],
+  );
+
+  const accessToken = generateAccessToken(user);
+
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      phone: user.phone,
+      status: user.status,
+      createdAt: user.created_at,
+    },
+    accessToken,
+  };
+}
+
 module.exports = {
   hashPassword,
   comparePassword,
   generateAccessToken,
   verifyAccessToken,
   registerUser,
+  loginUser,
 };

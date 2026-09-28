@@ -24,9 +24,12 @@ function validateRegistrationInput(body) {
   const displayName = typeof body.displayName === 'string' ? body.displayName.trim() : null;
 
   const preferredLanguage =
-    typeof body.preferredLanguage === 'string' ? body.preferredLanguage.trim().toLowerCase() : 'en';
+    typeof body.preferredLanguage === 'string'
+      ? body.preferredLanguage.trim().toLowerCase()
+      : 'en';
 
-  const timezone = typeof body.timezone === 'string' ? body.timezone.trim() : 'Africa/Addis_Ababa';
+  const timezone =
+    typeof body.timezone === 'string' ? body.timezone.trim() : 'Africa/Addis_Ababa';
 
   if (!faydaIdentifier) {
     errors.faydaIdentifier = 'Fayda identifier is required';
@@ -107,6 +110,41 @@ function validateRegistrationInput(body) {
   };
 }
 
+function validateLoginInput(body) {
+  const errors = {};
+
+  const identifier =
+    typeof body.identifier === 'string' ? body.identifier.trim() : null;
+
+  const password = typeof body.password === 'string' ? body.password : null;
+
+  if (!identifier) {
+    errors.identifier = 'Email or phone is required';
+  } else if (identifier.includes('@')) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)) {
+      errors.identifier = 'Invalid email address';
+    }
+  } else if (!/^\+?[1-9]\d{7,14}$/.test(identifier)) {
+    errors.identifier = 'Invalid phone number';
+  }
+
+  if (!password) {
+    errors.password = 'Password is required';
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+    data: {
+      identifier: identifier && identifier.includes('@')
+        ? identifier.toLowerCase()
+        : identifier,
+      password,
+    },
+  };
+}
+
 module.exports = {
   validateRegistrationInput,
+  validateLoginInput,
 };
