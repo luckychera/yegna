@@ -17,11 +17,11 @@ async function getUserAuthorization(userId) {
 
       FROM community_memberships cm
 
-      INNER JOIN membership_roles mr
+      LEFT JOIN membership_roles mr
         ON mr.membership_id = cm.id
        AND mr.revoked_at IS NULL
 
-      INNER JOIN community_roles cr
+      LEFT JOIN community_roles cr
         ON cr.id = mr.role_id
        AND cr.community_id = cm.community_id
 
@@ -49,16 +49,18 @@ async function getUserAuthorization(userId) {
 
     const community = communities.get(row.community_id);
 
-    community.roles.push({
-      id: row.role_id,
-      name: row.role_name,
-      assignedAt: row.assigned_at,
-    });
+    if (row.role_id) {
+      community.roles.push({
+        id: row.role_id,
+        name: row.role_name,
+        assignedAt: row.assigned_at,
+      });
 
-    if (Array.isArray(row.permissions)) {
-      for (const permission of row.permissions) {
-        if (typeof permission === 'string') {
-          community.permissions.add(permission);
+      if (Array.isArray(row.permissions)) {
+        for (const permission of row.permissions) {
+          if (typeof permission === 'string') {
+            community.permissions.add(permission);
+          }
         }
       }
     }
@@ -91,11 +93,11 @@ async function getUserCommunityAuthorization(userId, communityId) {
 
       FROM community_memberships cm
 
-      INNER JOIN membership_roles mr
+      LEFT JOIN membership_roles mr
         ON mr.membership_id = cm.id
        AND mr.revoked_at IS NULL
 
-      INNER JOIN community_roles cr
+      LEFT JOIN community_roles cr
         ON cr.id = mr.role_id
        AND cr.community_id = cm.community_id
 
@@ -108,10 +110,27 @@ async function getUserCommunityAuthorization(userId, communityId) {
     [userId, communityId],
   );
 
+  const membership = result.rows[0];
+
+  if (!membership) {
+    return {
+      communityId,
+      membershipId: null,
+      membershipNumber: null,
+      membershipStatus: null,
+      roles: [],
+      permissions: [],
+    };
+  }
+
   const roles = [];
   const permissions = new Set();
 
   for (const row of result.rows) {
+    if (!row.role_id) {
+      continue;
+    }
+
     roles.push({
       id: row.role_id,
       name: row.role_name,
@@ -128,12 +147,12 @@ async function getUserCommunityAuthorization(userId, communityId) {
   }
 
   return {
-    communityId,
-    membershipId: result.rows[0]?.membership_id || null,
-    membershipNumber: result.rows[0]?.membership_number || null,
-    membershipStatus: result.rows[0]?.membership_status || null,
+    communityId: membership.community_id,
+    membershipId: membership.membership_id,
+    membershipNumber: membership.membership_number,
+    membershipStatus: membership.membership_status,
     roles,
-    permissions: Array.from(permissions),
+    permissions: Array.from(permissions).sort(),
   };
 }
 
