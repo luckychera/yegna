@@ -15,6 +15,23 @@ async function getMyAuthorization(req, res, next) {
   }
 }
 
+async function checkMembersViewAccess(req, res, next) {
+  try {
+    return res.status(200).json({
+      success: true,
+      message: 'You have permission to view community members',
+      data: {
+        communityId: req.params.communityId,
+        permission: 'members.view',
+        authorization: req.authorization,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getMyAuthorization,
+  checkMembersViewAccess,
 };

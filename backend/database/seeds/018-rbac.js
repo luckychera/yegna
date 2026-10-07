@@ -23,9 +23,7 @@ async function seed() {
     );
 
     if (userResult.rows.length === 0) {
-      throw new Error(
-        'Sara test user was not found. Complete registration first.',
-      );
+      throw new Error('Sara test user was not found. Complete registration first.');
     }
 
     const userId = userResult.rows[0].id;
@@ -103,10 +101,33 @@ async function seed() {
       [
         communityId,
         JSON.stringify([
-          'community.read',
-          'community.members.read',
-          'community.members.manage',
-          'contributions.read',
+          'community.view',
+          'community.update',
+
+          'members.view',
+          'members.invite',
+          'members.update',
+          'members.remove',
+
+          'roles.view',
+          'roles.assign',
+          'roles.revoke',
+
+          'contributions.view',
+          'contributions.create',
+          'contributions.update',
+
+          'finance.view',
+          'finance.manage',
+
+          'payments.view',
+          'payments.create',
+          'payments.refund',
+
+          'reports.view',
+          'reports.export',
+
+          'audit.view',
         ]),
       ],
     );
