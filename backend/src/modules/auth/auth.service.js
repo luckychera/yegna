@@ -1,7 +1,9 @@
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 
 const env = require('../../config/env');
+
+const { generateAccessToken } = require('./token.service');
+const { createAuthSession } = require('./session.service');
 const { pool } = require('../../config/database');
 const { verifyFaydaIdentity } = require('../identity/fayda.service');
 
@@ -15,28 +17,14 @@ async function comparePassword(password, passwordHash) {
   return bcrypt.compare(password, passwordHash);
 }
 
-function generateAccessToken(user) {
-  return jwt.sign(
-    {
-      sub: user.id,
-    },
-    env.jwtSecret,
-    {
-      expiresIn: env.jwtExpiresIn,
-    },
-  );
-}
-
-function verifyAccessToken(token) {
-  return jwt.verify(token, env.jwtSecret);
-}
-
 async function registerUser({
   faydaIdentifier,
   faydaIdentifierType,
   email,
   phone,
   password,
+  ipAddress,
+  userAgent,
   firstName,
   middleName,
   lastName,
@@ -154,6 +142,12 @@ async function registerUser({
 
     await client.query('COMMIT');
 
+    const session = await createAuthSession({
+      userId: user.id,
+      ipAddress,
+      userAgent,
+    });
+
     const accessToken = generateAccessToken(user);
 
     return {
@@ -165,6 +159,8 @@ async function registerUser({
         createdAt: user.created_at,
       },
       accessToken,
+      refreshToken: session.refreshToken,
+      refreshTokenExpiresAt: session.refreshTokenExpiresAt,
     };
   } catch (error) {
     await client.query('ROLLBACK');
@@ -184,7 +180,9 @@ async function registerUser({
   }
 }
 
-async function loginUser({ identifier, password }) {
+async function loginUser({ email, phone, password, ipAddress, userAgent }) {
+  const identifier = email || phone;
+
   const result = await pool.query(
     `
       SELECT
@@ -197,8 +195,8 @@ async function loginUser({ identifier, password }) {
       FROM users
       WHERE deleted_at IS NULL
         AND (
-          LOWER(email) = LOWER($1)
-          OR phone = $1
+          LOWER(email) = LOWER($1::text)
+          OR phone = $1::text
         )
       LIMIT 1;
     `,
@@ -241,10 +239,16 @@ async function loginUser({ identifier, password }) {
       UPDATE users
       SET last_login_at = NOW(),
           updated_at = NOW()
-      WHERE id = $1;
+      WHERE id = $1
     `,
     [user.id],
   );
+
+  const session = await createAuthSession({
+    userId: user.id,
+    ipAddress,
+    userAgent,
+  });
 
   const accessToken = generateAccessToken(user);
 
@@ -257,14 +261,78 @@ async function loginUser({ identifier, password }) {
       createdAt: user.created_at,
     },
     accessToken,
+    refreshToken: session.refreshToken,
+    refreshTokenExpiresAt: session.refreshTokenExpiresAt,
+  };
+}
+
+async function changePassword({ userId, currentPassword, newPassword }) {
+  const result = await pool.query(
+    `
+      SELECT id, password_hash, status
+      FROM users
+      WHERE id = $1
+        AND deleted_at IS NULL
+      LIMIT 1
+    `,
+    [userId],
+  );
+
+  if (result.rows.length === 0) {
+    const error = new Error('User account not found');
+    error.statusCode = 404;
+    error.code = 'USER_NOT_FOUND';
+    throw error;
+  }
+
+  const user = result.rows[0];
+
+  if (user.status !== 'active') {
+    const error = new Error('Account is not active');
+    error.statusCode = 403;
+    error.code = 'ACCOUNT_NOT_ACTIVE';
+    throw error;
+  }
+
+  const currentPasswordMatches = await comparePassword(currentPassword, user.password_hash);
+
+  if (!currentPasswordMatches) {
+    const error = new Error('Current password is incorrect');
+    error.statusCode = 401;
+    error.code = 'INVALID_CURRENT_PASSWORD';
+    throw error;
+  }
+
+  const newPasswordMatches = await comparePassword(newPassword, user.password_hash);
+
+  if (newPasswordMatches) {
+    const error = new Error('New password must be different from the current password');
+    error.statusCode = 400;
+    error.code = 'PASSWORD_REUSE';
+    throw error;
+  }
+
+  const newPasswordHash = await hashPassword(newPassword);
+
+  await pool.query(
+    `
+      UPDATE users
+      SET password_hash = $1,
+          updated_at = NOW()
+      WHERE id = $2
+    `,
+    [newPasswordHash, userId],
+  );
+
+  return {
+    changed: true,
   };
 }
 
 module.exports = {
   hashPassword,
   comparePassword,
-  generateAccessToken,
-  verifyAccessToken,
   registerUser,
   loginUser,
+  changePassword,
 };
