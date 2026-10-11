@@ -20,7 +20,7 @@ const env = {
   databaseUrl: process.env.DATABASE_URL,
 
   jwtSecret: process.env.JWT_SECRET,
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '15m',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '330m',
 
   faydaMode: process.env.FAYDA_MODE || 'mock',
 
