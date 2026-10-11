@@ -21,12 +21,20 @@ const MOCK_FAYDA_RECORDS = new Map([
       verified: true,
     },
   ],
+  [
+    '100000000003',
+    {
+      identifierType: 'fin',
+      identifier: '100000000003',
+      firstName: 'Invitation',
+      middleName: 'Test',
+      lastName: 'User',
+      verified: true,
+    },
+  ],
 ]);
 
-async function verifyIdentity({
-  identifier,
-  identifierType,
-}) {
+async function verifyIdentity({ identifier, identifierType }) {
   const record = MOCK_FAYDA_RECORDS.get(identifier);
 
   if (!record) {

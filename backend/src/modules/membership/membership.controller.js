@@ -50,15 +50,14 @@ async function create(req, res, next) {
 
     const membership = await createMembership({
       communityId: req.params.communityId,
+      actorUserId: req.user.id,
       ...data,
     });
 
     return res.status(201).json({
       success: true,
       message: 'Membership created successfully',
-      data: {
-        membership,
-      },
+      data: { membership },
     });
   } catch (error) {
     next(error);
@@ -68,17 +67,19 @@ async function create(req, res, next) {
 async function update(req, res, next) {
   try {
     const membershipId = validateMembershipId(req.params.membershipId);
-
     const updates = validateUpdateMembershipInput(req.body);
 
-    const membership = await updateMembership(req.params.communityId, membershipId, updates);
+    const membership = await updateMembership(
+      req.params.communityId,
+      membershipId,
+      updates,
+      req.user.id,
+    );
 
     return res.status(200).json({
       success: true,
       message: 'Membership updated successfully',
-      data: {
-        membership,
-      },
+      data: { membership },
     });
   } catch (error) {
     next(error);
@@ -89,14 +90,17 @@ async function approve(req, res, next) {
   try {
     const membershipId = validateMembershipId(req.params.membershipId);
 
-    const membership = await changeMembershipStatus(req.params.communityId, membershipId, 'active');
+    const membership = await changeMembershipStatus(
+      req.params.communityId,
+      membershipId,
+      'active',
+      req.user.id,
+    );
 
     return res.status(200).json({
       success: true,
       message: 'Membership approved successfully',
-      data: {
-        membership,
-      },
+      data: { membership },
     });
   } catch (error) {
     next(error);
@@ -111,14 +115,13 @@ async function reject(req, res, next) {
       req.params.communityId,
       membershipId,
       'rejected',
+      req.user.id,
     );
 
     return res.status(200).json({
       success: true,
       message: 'Membership rejected successfully',
-      data: {
-        membership,
-      },
+      data: { membership },
     });
   } catch (error) {
     next(error);
@@ -133,14 +136,13 @@ async function suspend(req, res, next) {
       req.params.communityId,
       membershipId,
       'suspended',
+      req.user.id,
     );
 
     return res.status(200).json({
       success: true,
       message: 'Membership suspended successfully',
-      data: {
-        membership,
-      },
+      data: { membership },
     });
   } catch (error) {
     next(error);
@@ -151,14 +153,17 @@ async function remove(req, res, next) {
   try {
     const membershipId = validateMembershipId(req.params.membershipId);
 
-    const membership = await changeMembershipStatus(req.params.communityId, membershipId, 'left');
+    const membership = await changeMembershipStatus(
+      req.params.communityId,
+      membershipId,
+      'left',
+      req.user.id,
+    );
 
     return res.status(200).json({
       success: true,
       message: 'Membership removed successfully',
-      data: {
-        membership,
-      },
+      data: { membership },
     });
   } catch (error) {
     next(error);

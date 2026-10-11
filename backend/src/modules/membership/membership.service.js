@@ -1,4 +1,6 @@
 const { pool } = require('../../config/database');
+const { createAuditLog } = require('../audit/audit.service');
+const { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } = require('../audit/audit.constants');
 
 function createMembershipError(message, statusCode, code) {
   const error = new Error(message);
@@ -159,24 +161,44 @@ async function getMembershipById(communityId, membershipId) {
   return result.rows[0];
 }
 
-async function createMembership({ communityId, userId, membershipNumber, metadata }) {
+async function createMembership({
+  communityId,
+  userId,
+  membershipNumber,
+  metadata,
+  actorUserId,
+  client: providedClient = null,
+  initialStatus = null,
+}) {
   await ensureCommunityExists(communityId);
   await ensureUserExists(userId);
 
   const settings = await getMembershipSettings(communityId);
 
-  const status = settings.membershipRequiresApproval ? 'pending' : 'active';
-
-  const client = await pool.connect();
+  const status =
+    initialStatus === 'active'
+      ? 'active'
+      : settings.membershipRequiresApproval
+        ? 'pending'
+        : 'active';
+        
+  const client = providedClient || (await pool.connect());
+  const ownsTransaction = !providedClient;
 
   try {
-    await client.query('BEGIN');
-
+    if (ownsTransaction) {
+      await client.query('BEGIN');
+    }
     const existingResult = await client.query(
       `
         SELECT
           id,
-          status
+          status,
+          membership_number,
+          metadata,
+          joined_at,
+          approved_at,
+          left_at
         FROM community_memberships
         WHERE community_id = $1
           AND user_id = $2
@@ -202,91 +224,141 @@ async function createMembership({ communityId, userId, membershipNumber, metadat
 
       const result = await client.query(
         `
-    UPDATE community_memberships
-    SET
-      membership_number = $1::VARCHAR(50),
-      status = $2::VARCHAR(32),
-      joined_at = CASE
-        WHEN $2::VARCHAR(32) = 'active'
-          THEN COALESCE(joined_at, NOW())
-        ELSE NULL
-      END,
-      approved_at = CASE
-        WHEN $2::VARCHAR(32) = 'active'
-          THEN NOW()
-        ELSE NULL
-      END,
-      left_at = NULL,
-      metadata = $3::JSONB
-    WHERE id = $4
-    RETURNING
-      id,
-      community_id,
-      user_id,
-      membership_number,
-      status,
-      joined_at,
-      approved_at,
-      left_at,
-      metadata,
-      created_at,
-      updated_at;
-  `,
+          UPDATE community_memberships
+          SET
+            membership_number = $1::VARCHAR(50),
+            status = $2::VARCHAR(32),
+            joined_at = CASE
+              WHEN $2::VARCHAR(32) = 'active'
+                THEN COALESCE(joined_at, NOW())
+              ELSE NULL
+            END,
+            approved_at = CASE
+              WHEN $2::VARCHAR(32) = 'active'
+                THEN NOW()
+              ELSE NULL
+            END,
+            left_at = NULL,
+            metadata = $3::JSONB
+          WHERE id = $4
+          RETURNING
+            id,
+            community_id,
+            user_id,
+            membership_number,
+            status,
+            joined_at,
+            approved_at,
+            left_at,
+            metadata,
+            created_at,
+            updated_at;
+        `,
         [membershipNumber, status, JSON.stringify(metadata), existing.id],
       );
 
-      await client.query('COMMIT');
+      const membership = result.rows[0];
 
-      return result.rows[0];
+      await createAuditLog({
+        userId: actorUserId,
+        communityId,
+        action: AUDIT_ACTIONS.MEMBERSHIP_REJOINED,
+        entityType: AUDIT_ENTITY_TYPES.MEMBERSHIP,
+        entityId: membership.id,
+        oldValues: {
+          status: existing.status,
+          membershipNumber: existing.membership_number,
+          metadata: existing.metadata,
+          joinedAt: existing.joined_at,
+          approvedAt: existing.approved_at,
+          leftAt: existing.left_at,
+        },
+        newValues: {
+          status: membership.status,
+          membershipNumber: membership.membership_number,
+          metadata: membership.metadata,
+          joinedAt: membership.joined_at,
+          approvedAt: membership.approved_at,
+          leftAt: membership.left_at,
+        },
+      });
+
+      if (ownsTransaction) {
+        await client.query('COMMIT');
+      }
+
+      return membership;
     }
 
     const result = await client.query(
       `
-    INSERT INTO community_memberships (
-      community_id,
-      user_id,
-      membership_number,
-      status,
-      joined_at,
-      approved_at,
-      metadata
-    )
-    VALUES (
-      $1,
-      $2,
-      $3,
-      $4::VARCHAR(32),
-      CASE
-        WHEN $4::VARCHAR(32) = 'active' THEN NOW()
-        ELSE NULL
-      END,
-      CASE
-        WHEN $4::VARCHAR(32) = 'active' THEN NOW()
-        ELSE NULL
-      END,
-      $5::JSONB
-    )
-    RETURNING
-      id,
-      community_id,
-      user_id,
-      membership_number,
-      status,
-      joined_at,
-      approved_at,
-      left_at,
-      metadata,
-      created_at,
-      updated_at;
-  `,
+        INSERT INTO community_memberships (
+          community_id,
+          user_id,
+          membership_number,
+          status,
+          joined_at,
+          approved_at,
+          metadata
+        )
+        VALUES (
+          $1,
+          $2,
+          $3,
+          $4::VARCHAR(32),
+          CASE
+            WHEN $4::VARCHAR(32) = 'active' THEN NOW()
+            ELSE NULL
+          END,
+          CASE
+            WHEN $4::VARCHAR(32) = 'active' THEN NOW()
+            ELSE NULL
+          END,
+          $5::JSONB
+        )
+        RETURNING
+          id,
+          community_id,
+          user_id,
+          membership_number,
+          status,
+          joined_at,
+          approved_at,
+          left_at,
+          metadata,
+          created_at,
+          updated_at;
+      `,
       [communityId, userId, membershipNumber, status, JSON.stringify(metadata)],
     );
 
-    await client.query('COMMIT');
+    const membership = result.rows[0];
 
-    return result.rows[0];
+    await createAuditLog({
+      userId: actorUserId,
+      communityId,
+      action: AUDIT_ACTIONS.MEMBERSHIP_CREATED,
+      entityType: AUDIT_ENTITY_TYPES.MEMBERSHIP,
+      entityId: membership.id,
+      newValues: {
+        status: membership.status,
+        membershipNumber: membership.membership_number,
+        metadata: membership.metadata,
+        joinedAt: membership.joined_at,
+        approvedAt: membership.approved_at,
+        leftAt: membership.left_at,
+      },
+    });
+
+    if (ownsTransaction) {
+      await client.query('COMMIT');
+    }
+
+    return membership;
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (ownsTransaction) {
+      await client.query('ROLLBACK');
+    }
 
     if (error.code === '23505') {
       throw createMembershipError(
@@ -298,57 +370,117 @@ async function createMembership({ communityId, userId, membershipNumber, metadat
 
     throw error;
   } finally {
-    client.release();
+    if (ownsTransaction) {
+      client.release();
+    }
   }
 }
 
-async function updateMembership(communityId, membershipId, updates) {
-  const fields = [];
-  const values = [];
-  let parameterIndex = 1;
+async function updateMembership(communityId, membershipId, updates, actorUserId) {
+  const client = await pool.connect();
 
-  if (Object.prototype.hasOwnProperty.call(updates, 'membershipNumber')) {
-    fields.push(`membership_number = $${parameterIndex}`);
-    values.push(updates.membershipNumber);
-    parameterIndex += 1;
+  try {
+    await client.query('BEGIN');
+
+    const currentResult = await client.query(
+      `
+        SELECT
+          id,
+          community_id,
+          user_id,
+          membership_number,
+          status,
+          joined_at,
+          approved_at,
+          left_at,
+          metadata,
+          created_at,
+          updated_at
+        FROM community_memberships
+        WHERE community_id = $1
+          AND id = $2
+        FOR UPDATE;
+      `,
+      [communityId, membershipId],
+    );
+
+    if (currentResult.rows.length === 0) {
+      throw createMembershipError('Membership not found', 404, 'MEMBERSHIP_NOT_FOUND');
+    }
+
+    const current = currentResult.rows[0];
+
+    const fields = [];
+    const values = [];
+    let parameterIndex = 1;
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'membershipNumber')) {
+      fields.push(`membership_number = $${parameterIndex}`);
+      values.push(updates.membershipNumber);
+      parameterIndex += 1;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'metadata')) {
+      fields.push(`metadata = $${parameterIndex}::JSONB`);
+      values.push(JSON.stringify(updates.metadata));
+      parameterIndex += 1;
+    }
+
+    values.push(communityId);
+    values.push(membershipId);
+
+    const result = await client.query(
+      `
+        UPDATE community_memberships
+        SET ${fields.join(', ')}
+        WHERE community_id = $${parameterIndex}
+          AND id = $${parameterIndex + 1}
+        RETURNING
+          id,
+          community_id,
+          user_id,
+          membership_number,
+          status,
+          joined_at,
+          approved_at,
+          left_at,
+          metadata,
+          created_at,
+          updated_at;
+      `,
+      values,
+    );
+
+    const membership = result.rows[0];
+
+    await createAuditLog({
+      userId: actorUserId,
+      communityId,
+      action: AUDIT_ACTIONS.MEMBERSHIP_UPDATED,
+      entityType: AUDIT_ENTITY_TYPES.MEMBERSHIP,
+      entityId: membership.id,
+      oldValues: {
+        membershipNumber: current.membership_number,
+        status: current.status,
+        metadata: current.metadata,
+      },
+      newValues: {
+        membershipNumber: membership.membership_number,
+        status: membership.status,
+        metadata: membership.metadata,
+      },
+      client,
+    });
+
+    await client.query('COMMIT');
+
+    return membership;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
-
-  if (Object.prototype.hasOwnProperty.call(updates, 'metadata')) {
-    fields.push(`metadata = $${parameterIndex}::JSONB`);
-    values.push(JSON.stringify(updates.metadata));
-    parameterIndex += 1;
-  }
-
-  values.push(communityId);
-  values.push(membershipId);
-
-  const result = await pool.query(
-    `
-      UPDATE community_memberships
-      SET ${fields.join(', ')}
-      WHERE community_id = $${parameterIndex}
-        AND id = $${parameterIndex + 1}
-      RETURNING
-        id,
-        community_id,
-        user_id,
-        membership_number,
-        status,
-        joined_at,
-        approved_at,
-        left_at,
-        metadata,
-        created_at,
-        updated_at;
-    `,
-    values,
-  );
-
-  if (result.rows.length === 0) {
-    throw createMembershipError('Membership not found', 404, 'MEMBERSHIP_NOT_FOUND');
-  }
-
-  return result.rows[0];
 }
 
 const STATUS_TRANSITIONS = Object.freeze({
@@ -359,60 +491,132 @@ const STATUS_TRANSITIONS = Object.freeze({
   left: Object.freeze(['pending']),
 });
 
-async function changeMembershipStatus(communityId, membershipId, newStatus) {
-  const current = await getMembershipById(communityId, membershipId);
+async function changeMembershipStatus(communityId, membershipId, newStatus, actorUserId) {
+  const client = await pool.connect();
 
-  const allowedTransitions = STATUS_TRANSITIONS[current.status] || [];
+  try {
+    await client.query('BEGIN');
 
-  if (!allowedTransitions.includes(newStatus)) {
-    throw createMembershipError(
-      `Cannot change membership from ${current.status} to ${newStatus}`,
-      400,
-      'INVALID_MEMBERSHIP_STATUS_TRANSITION',
+    const currentResult = await client.query(
+      `
+        SELECT
+          id,
+          community_id,
+          user_id,
+          membership_number,
+          status,
+          joined_at,
+          approved_at,
+          left_at,
+          metadata,
+          created_at,
+          updated_at
+        FROM community_memberships
+        WHERE community_id = $1
+          AND id = $2
+        FOR UPDATE;
+      `,
+      [communityId, membershipId],
     );
+
+    if (currentResult.rows.length === 0) {
+      throw createMembershipError('Membership not found', 404, 'MEMBERSHIP_NOT_FOUND');
+    }
+
+    const current = currentResult.rows[0];
+
+    const allowedTransitions = STATUS_TRANSITIONS[current.status] || [];
+
+    if (!allowedTransitions.includes(newStatus)) {
+      throw createMembershipError(
+        `Cannot change membership from ${current.status} to ${newStatus}`,
+        400,
+        'INVALID_MEMBERSHIP_STATUS_TRANSITION',
+      );
+    }
+
+    const result = await client.query(
+      `
+        UPDATE community_memberships
+        SET
+          status = $1::VARCHAR(32),
+          joined_at = CASE
+            WHEN $1::VARCHAR(32) = 'active'
+              THEN COALESCE(joined_at, NOW())
+            ELSE joined_at
+          END,
+          approved_at = CASE
+            WHEN $1::VARCHAR(32) = 'active'
+              THEN NOW()
+            ELSE approved_at
+          END,
+          left_at = CASE
+            WHEN $1::VARCHAR(32) = 'left'
+              THEN NOW()
+            WHEN $1::VARCHAR(32) = 'active'
+              THEN NULL
+            ELSE left_at
+          END
+        WHERE community_id = $2
+          AND id = $3
+        RETURNING
+          id,
+          community_id,
+          user_id,
+          membership_number,
+          status,
+          joined_at,
+          approved_at,
+          left_at,
+          metadata,
+          created_at,
+          updated_at;
+      `,
+      [newStatus, communityId, membershipId],
+    );
+
+    const membership = result.rows[0];
+
+    const auditAction =
+      current.status === 'suspended' && newStatus === 'active'
+        ? AUDIT_ACTIONS.MEMBERSHIP_REACTIVATED
+        : {
+            active: AUDIT_ACTIONS.MEMBERSHIP_APPROVED,
+            rejected: AUDIT_ACTIONS.MEMBERSHIP_REJECTED,
+            suspended: AUDIT_ACTIONS.MEMBERSHIP_SUSPENDED,
+            left: AUDIT_ACTIONS.MEMBERSHIP_REMOVED,
+          }[newStatus];
+
+    await createAuditLog({
+      userId: actorUserId,
+      communityId,
+      action: auditAction,
+      entityType: AUDIT_ENTITY_TYPES.MEMBERSHIP,
+      entityId: membership.id,
+      oldValues: {
+        status: current.status,
+        joinedAt: current.joined_at,
+        approvedAt: current.approved_at,
+        leftAt: current.left_at,
+      },
+      newValues: {
+        status: membership.status,
+        joinedAt: membership.joined_at,
+        approvedAt: membership.approved_at,
+        leftAt: membership.left_at,
+      },
+      client,
+    });
+
+    await client.query('COMMIT');
+
+    return membership;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
-
-  const result = await pool.query(
-    `
-    UPDATE community_memberships
-    SET
-      status = $1::VARCHAR(32),
-      joined_at = CASE
-        WHEN $1::VARCHAR(32) = 'active'
-          THEN COALESCE(joined_at, NOW())
-        ELSE joined_at
-      END,
-      approved_at = CASE
-        WHEN $1::VARCHAR(32) = 'active'
-          THEN NOW()
-        ELSE approved_at
-      END,
-      left_at = CASE
-        WHEN $1::VARCHAR(32) = 'left'
-          THEN NOW()
-        WHEN $1::VARCHAR(32) = 'active'
-          THEN NULL
-        ELSE left_at
-      END
-    WHERE community_id = $2
-      AND id = $3
-    RETURNING
-      id,
-      community_id,
-      user_id,
-      membership_number,
-      status,
-      joined_at,
-      approved_at,
-      left_at,
-      metadata,
-      created_at,
-      updated_at;
-  `,
-    [newStatus, communityId, membershipId],
-  );
-
-  return result.rows[0];
 }
 
 module.exports = {

@@ -6,6 +6,7 @@ const identityRoutes = require('../modules/identity/identity.routes');
 const authorizationRoutes = require('../modules/authorization/authorization.routes');
 const communityRoutes = require('../modules/community/community.routes');
 const membershipRoutes = require('../modules/membership/membership.routes');
+const invitationRoutes = require('../modules/invitation/invitation.routes');
 
 const router = express.Router();
 
@@ -15,5 +16,6 @@ router.use('/identity', identityRoutes);
 router.use('/authorization', authorizationRoutes);
 router.use('/communities', communityRoutes);
 router.use('/communities', membershipRoutes);
+router.use('/', invitationRoutes);
 
 module.exports = router;
