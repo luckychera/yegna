@@ -13,6 +13,14 @@ const AUDIT_ACTIONS = Object.freeze({
   INVITATION_REJECTED: 'invitation.rejected',
   INVITATION_REVOKED: 'invitation.revoked',
   INVITATION_EXPIRED: 'invitation.expired',
+
+  CONTRIBUTION_CREATED: 'contribution.created',
+  CONTRIBUTION_UPDATED: 'contribution.updated',
+  CONTRIBUTION_WAIVED: 'contribution.waived',
+  CONTRIBUTION_CANCELLED: 'contribution.cancelled',
+  CONTRIBUTION_OVERDUE: 'contribution.overdue',
+  CONTRIBUTION_PAID: 'contribution.paid',
+  CONTRIBUTION_PARTIALLY_PAID: 'contribution.partially_paid',
 });
 
 const AUDIT_ENTITY_TYPES = Object.freeze({
