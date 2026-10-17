@@ -8,6 +8,7 @@ const communityRoutes = require('../modules/community/community.routes');
 const membershipRoutes = require('../modules/membership/membership.routes');
 const invitationRoutes = require('../modules/invitation/invitation.routes');
 const contributionRoutes = require('../modules/contribution/contribution.routes');
+const paymentRoutes = require('../modules/payment/payment.routes');
 
 const router = express.Router();
 
@@ -19,4 +20,6 @@ router.use('/communities', communityRoutes);
 router.use('/communities', membershipRoutes);
 router.use('/communities', invitationRoutes);
 router.use('/communities', contributionRoutes);
+router.use(paymentRoutes);
+
 module.exports = router;

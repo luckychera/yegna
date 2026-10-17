@@ -1,0 +1,48 @@
+const PAYMENT_STATUS = Object.freeze({
+  PENDING: 'pending',
+  PROCESSING: 'processing',
+  SUCCESSFUL: 'successful',
+  FAILED: 'failed',
+  CANCELLED: 'cancelled',
+  REFUNDED: 'refunded',
+});
+
+const PAYMENT_PROVIDER = Object.freeze({
+  CHAPA: 'chapa',
+});
+
+const PAYMENT_METHOD = Object.freeze({
+  TELEBIRR: 'telebirr',
+  BANK: 'bank',
+  CARD: 'card',
+  MOBILE_MONEY: 'mobile_money',
+  CASH: 'cash',
+  OTHER: 'other',
+});
+
+const PAYMENT_CURRENCY_DEFAULT = 'ETB';
+
+const PAYMENT_STATUS_TRANSITIONS = Object.freeze({
+  [PAYMENT_STATUS.PENDING]: [
+    PAYMENT_STATUS.PROCESSING,
+    PAYMENT_STATUS.FAILED,
+    PAYMENT_STATUS.CANCELLED,
+  ],
+  [PAYMENT_STATUS.PROCESSING]: [
+    PAYMENT_STATUS.SUCCESSFUL,
+    PAYMENT_STATUS.FAILED,
+    PAYMENT_STATUS.CANCELLED,
+  ],
+  [PAYMENT_STATUS.SUCCESSFUL]: [PAYMENT_STATUS.REFUNDED],
+  [PAYMENT_STATUS.FAILED]: [],
+  [PAYMENT_STATUS.CANCELLED]: [],
+  [PAYMENT_STATUS.REFUNDED]: [],
+});
+
+module.exports = {
+  PAYMENT_STATUS,
+  PAYMENT_PROVIDER,
+  PAYMENT_METHOD,
+  PAYMENT_CURRENCY_DEFAULT,
+  PAYMENT_STATUS_TRANSITIONS,
+};
