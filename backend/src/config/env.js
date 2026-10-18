@@ -26,6 +26,7 @@ const env = {
 
   chapaMode: process.env.CHAPA_MODE || 'test',
   chapaSecretKey: process.env.CHAPA_SECRET_KEY || '',
+  chapaBaseUrl: process.env.CHAPA_BASE_URL || 'https://api.chapa.co',
 
   aiApiKey: process.env.AI_API_KEY || '',
 

@@ -9,6 +9,7 @@ const {
 
 const { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } = require('../audit/audit.constants');
 const { createAuditLog } = require('../audit/audit.service');
+const { getPaymentProvider } = require('./payment-provider/payment-provider.factory');
 
 function createServiceError(message, statusCode, code) {
   const error = new Error(message);
@@ -355,6 +356,126 @@ async function createPayment({
   }
 }
 
+async function initializeProviderPayment({
+  communityId,
+  paymentId,
+  providerName = 'chapa',
+  callbackUrl = null,
+  returnUrl = null,
+  providerFactory = getPaymentProvider,
+}) {
+  validatePaymentId(paymentId);
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const paymentResult = await client.query(
+      `
+        SELECT
+          pt.*,
+          u.email,
+          u.phone,
+          up.first_name,
+          up.last_name
+        FROM payment_transactions pt
+        INNER JOIN users u
+          ON u.id = pt.user_id
+        LEFT JOIN user_profiles up
+          ON up.user_id = u.id
+        WHERE pt.id = $1
+          AND pt.community_id = $2
+        FOR UPDATE OF pt
+      `,
+      [paymentId, communityId],
+    );
+
+    if (paymentResult.rowCount === 0) {
+      throw createServiceError('Payment transaction not found', 404, 'PAYMENT_NOT_FOUND');
+    }
+
+    const payment = paymentResult.rows[0];
+
+    if (payment.status !== PAYMENT_STATUS.PENDING) {
+      throw createServiceError(
+        `Only pending payments can be initialized`,
+        400,
+        'PAYMENT_NOT_INITIALIZABLE',
+      );
+    }
+
+    const provider = providerFactory(providerName);
+
+    const txRef = `YEGNA-PAY-${payment.id}`;
+
+    const providerResult = await provider.initializePayment({
+      amount: payment.amount,
+      currency: payment.currency,
+      txRef,
+      customer: {
+        email: payment.email,
+        phone: payment.phone,
+        firstName: payment.first_name,
+        lastName: payment.last_name,
+      },
+      callbackUrl,
+      returnUrl,
+      metadata: {
+        yegnaPaymentId: payment.id,
+        communityId,
+        contributionId: payment.contribution_id,
+      },
+    });
+
+    if (!providerResult || !providerResult.checkoutUrl) {
+      throw createServiceError(
+        'Payment provider did not return a checkout URL',
+        502,
+        'PAYMENT_CHECKOUT_URL_MISSING',
+      );
+    }
+
+    const updatedResult = await client.query(
+      `
+        UPDATE payment_transactions
+        SET
+          provider = $1,
+          provider_transaction_id = $2,
+          provider_reference = $3,
+          checkout_url = $4,
+          updated_at = NOW()
+        WHERE id = $5
+          AND community_id = $6
+        RETURNING *
+      `,
+      [
+        providerName,
+        providerResult.providerTransactionId,
+        providerResult.providerReference,
+        providerResult.checkoutUrl,
+        paymentId,
+        communityId,
+      ],
+    );
+
+    const updatedPayment = updatedResult.rows[0];
+
+    await client.query('COMMIT');
+
+    return {
+      payment: updatedPayment,
+      checkoutUrl: providerResult.checkoutUrl,
+      provider: providerName,
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 async function updatePaymentStatus(communityId, paymentId, nextStatus, actorUserId, options = {}) {
   validatePaymentId(paymentId);
   validatePaymentStatus(nextStatus);
@@ -605,6 +726,7 @@ module.exports = {
   getPaymentById,
   listPayments,
   createPayment,
+  initializeProviderPayment,
   updatePaymentStatus,
   markPaymentProcessing,
   markPaymentSuccessful,

@@ -8,6 +8,7 @@ const {
   listPayments,
   getPaymentById,
   createPayment,
+  initializeProviderPayment,
   updatePaymentStatus,
   markPaymentProcessing,
   markPaymentSuccessful,
@@ -36,6 +37,29 @@ async function createPaymentController(req, res, next) {
     });
 
     return res.status(201).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function initializeProviderPaymentController(req, res, next) {
+  try {
+    const { communityId, paymentId } = req.params;
+
+    validatePaymentId(paymentId);
+
+    const result = await initializeProviderPayment({
+      communityId,
+      paymentId,
+      providerName: req.body?.provider || 'chapa',
+      callbackUrl: req.body?.callbackUrl || null,
+      returnUrl: req.body?.returnUrl || null,
+    });
+
+    return res.status(200).json({
       success: true,
       data: result,
     });
@@ -82,11 +106,7 @@ async function processPaymentController(req, res, next) {
 
     validatePaymentId(paymentId);
 
-    const payment = await markPaymentProcessing(
-      communityId,
-      paymentId,
-      getActorUserId(req),
-    );
+    const payment = await markPaymentProcessing(communityId, paymentId, getActorUserId(req));
 
     return res.status(200).json({
       success: true,
@@ -103,11 +123,7 @@ async function successfulPaymentController(req, res, next) {
 
     validatePaymentId(paymentId);
 
-    const payment = await markPaymentSuccessful(
-      communityId,
-      paymentId,
-      getActorUserId(req),
-    );
+    const payment = await markPaymentSuccessful(communityId, paymentId, getActorUserId(req));
 
     return res.status(200).json({
       success: true,
@@ -146,11 +162,7 @@ async function cancelPaymentController(req, res, next) {
 
     validatePaymentId(paymentId);
 
-    const payment = await cancelPayment(
-      communityId,
-      paymentId,
-      getActorUserId(req),
-    );
+    const payment = await cancelPayment(communityId, paymentId, getActorUserId(req));
 
     return res.status(200).json({
       success: true,
@@ -167,11 +179,7 @@ async function refundPaymentController(req, res, next) {
 
     validatePaymentId(paymentId);
 
-    const payment = await refundPayment(
-      communityId,
-      paymentId,
-      getActorUserId(req),
-    );
+    const payment = await refundPayment(communityId, paymentId, getActorUserId(req));
 
     return res.status(200).json({
       success: true,
@@ -190,12 +198,7 @@ async function updatePaymentStatusController(req, res, next) {
     validatePaymentId(paymentId);
     validatePaymentStatus(status);
 
-    const payment = await updatePaymentStatus(
-      communityId,
-      paymentId,
-      status,
-      getActorUserId(req),
-    );
+    const payment = await updatePaymentStatus(communityId, paymentId, status, getActorUserId(req));
 
     return res.status(200).json({
       success: true,
@@ -208,6 +211,7 @@ async function updatePaymentStatusController(req, res, next) {
 
 module.exports = {
   createPaymentController,
+  initializeProviderPaymentController,
   listPaymentsController,
   getPaymentController,
   processPaymentController,

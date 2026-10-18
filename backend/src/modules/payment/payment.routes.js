@@ -6,6 +6,7 @@ const { requirePermission } = require('../authorization/authorization.middleware
 const {
   createPaymentController,
   listPaymentsController,
+  initializeProviderPaymentController,
   getPaymentController,
   processPaymentController,
   successfulPaymentController,
@@ -37,6 +38,13 @@ router.post(
   '/communities/:communityId/payments',
   requirePermission('payments.create'),
   createPaymentController,
+);
+
+// Initialize payment with external provider
+router.post(
+  '/communities/:communityId/payments/:paymentId/initialize',
+  requirePermission('payments.create'),
+  initializeProviderPaymentController,
 );
 
 // Payment lifecycle
