@@ -5,6 +5,7 @@ const { INVITATION_STATUS, INVITATION_DEFAULT_EXPIRY_DAYS } = require('./invitat
 const { createAuditLog } = require('../audit/audit.service');
 const { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } = require('../audit/audit.constants');
 const { createMembership } = require('../membership/membership.service');
+const { notifySafely } = require('../notification/notification.events');
 
 const INVITATION_TOKEN_BYTES = 32;
 
@@ -168,6 +169,17 @@ async function createInvitation({ communityId, inviterUserId, invitedUserId, met
     });
 
     await client.query('COMMIT');
+
+    await notifySafely({
+      userId: invitedUserId,
+      communityId,
+      type: 'invitation_received',
+      title: 'Community invitation received',
+      message: 'You have received an invitation to join a community.',
+      entityType: 'invitation',
+      entityId: invitation.id,
+      metadata: { invitationId: invitation.id },
+    });
 
     return {
       ...invitation,
@@ -352,6 +364,17 @@ async function rejectInvitation(invitationId, invitedUserId) {
 
     await client.query('COMMIT');
 
+    await notifySafely({
+      userId: invitation.inviter_user_id,
+      communityId: invitation.community_id,
+      type: 'invitation_rejected',
+      title: 'Invitation declined',
+      message: 'A member has declined your community invitation.',
+      entityType: 'invitation',
+      entityId: invitation.id,
+      metadata: { invitationId: invitation.id },
+    });
+
     return updatedInvitation;
   } catch (error) {
     if (client._queryable) {
@@ -368,7 +391,9 @@ async function rejectInvitation(invitationId, invitedUserId) {
   }
 }
 
-async function revokeInvitation(invitationId, actorUserId) {
+// communityId is optional so existing callers keep working. When provided (as the
+// HTTP route does), an invitation from any other community is reported as not found.
+async function revokeInvitation(invitationId, actorUserId, communityId = null) {
   const client = await pool.connect();
 
   try {
@@ -389,6 +414,10 @@ async function revokeInvitation(invitationId, actorUserId) {
     }
 
     const invitation = result.rows[0];
+
+    if (communityId && invitation.community_id !== communityId) {
+      throw createServiceError('Invitation not found', 404, 'INVITATION_NOT_FOUND');
+    }
 
     if (invitation.status !== INVITATION_STATUS.PENDING) {
       throw createServiceError(
@@ -449,26 +478,45 @@ async function revokeInvitation(invitationId, actorUserId) {
   }
 }
 
-async function acceptInvitation({ invitationToken, invitedUserId }) {
+// Accepts an invitation identified either by its secret token (the original
+// flow) or by its ID (used by the in-app invitation inbox, which never receives
+// the token). Both paths share the same recipient check, status/expiry rules and
+// membership transaction below.
+async function acceptInvitation({ invitationToken, invitationId, invitedUserId }) {
+  if (!invitationId && (typeof invitationToken !== 'string' || !invitationToken)) {
+    const error = createServiceError('invitationToken is required', 400, 'VALIDATION_ERROR');
+    throw error;
+  }
+
   const client = await pool.connect();
 
   try {
     await client.query('BEGIN');
 
-    const tokenHash = hashInvitationToken(invitationToken);
-
-    const invitationResult = await client.query(
-      `
-        SELECT *
-        FROM community_invitations
-        WHERE token_hash = $1
-        FOR UPDATE
-      `,
-      [tokenHash],
-    );
+    const invitationResult = invitationId
+      ? await client.query(
+          `
+            SELECT *
+            FROM community_invitations
+            WHERE id = $1
+            FOR UPDATE
+          `,
+          [invitationId],
+        )
+      : await client.query(
+          `
+            SELECT *
+            FROM community_invitations
+            WHERE token_hash = $1
+            FOR UPDATE
+          `,
+          [hashInvitationToken(invitationToken)],
+        );
 
     if (invitationResult.rowCount === 0) {
-      throw createServiceError('Invalid invitation token', 404, 'INVITATION_NOT_FOUND');
+      throw invitationId
+        ? createServiceError('Invitation not found', 404, 'INVITATION_NOT_FOUND')
+        : createServiceError('Invalid invitation token', 404, 'INVITATION_NOT_FOUND');
     }
 
     const invitation = invitationResult.rows[0];
@@ -583,6 +631,17 @@ async function acceptInvitation({ invitationToken, invitedUserId }) {
 
     await client.query('COMMIT');
 
+    await notifySafely({
+      userId: invitation.inviter_user_id,
+      communityId: invitation.community_id,
+      type: 'invitation_accepted',
+      title: 'Invitation accepted',
+      message: 'A member has accepted your community invitation.',
+      entityType: 'invitation',
+      entityId: invitation.id,
+      metadata: { invitationId: invitation.id },
+    });
+
     return {
       invitation: updatedInvitation,
       membership,
@@ -595,7 +654,99 @@ async function acceptInvitation({ invitationToken, invitedUserId }) {
   }
 }
 
+const MY_INVITATION_STATUSES = Object.freeze(Object.values(INVITATION_STATUS));
+
+// Pending invitations whose expiry has passed are reported as "expired" here even
+// though the stored status only changes when someone acts on them.
+const EFFECTIVE_INVITATION_STATUS_SQL = `
+  CASE
+    WHEN ci.status = 'pending' AND ci.expires_at <= NOW() THEN 'expired'
+    ELSE ci.status
+  END
+`;
+
+// Invitations addressed to the authenticated user. Never selects token_hash.
+async function listMyInvitations({ userId, status, limit, offset }) {
+  const params = [userId];
+  let statusFilter = '';
+
+  if (status) {
+    params.push(status);
+    statusFilter = `AND (${EFFECTIVE_INVITATION_STATUS_SQL}) = $${params.length}`;
+  }
+
+  const countResult = await pool.query(
+    `
+      SELECT COUNT(*)::INT AS total
+      FROM community_invitations ci
+      JOIN communities c
+        ON c.id = ci.community_id
+       AND c.archived_at IS NULL
+      WHERE ci.invited_user_id = $1
+        ${statusFilter};
+    `,
+    params,
+  );
+
+  params.push(limit, offset);
+
+  const result = await pool.query(
+    `
+      SELECT
+        ci.id,
+        ci.community_id,
+        ci.status AS stored_status,
+        (${EFFECTIVE_INVITATION_STATUS_SQL}) AS status,
+        ci.expires_at,
+        ci.accepted_at,
+        ci.rejected_at,
+        ci.created_at,
+        c.name AS community_name,
+        c.logo_url AS community_logo_url,
+        COALESCE(
+          NULLIF(TRIM(up.display_name), ''),
+          NULLIF(TRIM(CONCAT_WS(' ', up.first_name, up.last_name)), '')
+        ) AS inviter_name
+      FROM community_invitations ci
+      JOIN communities c
+        ON c.id = ci.community_id
+       AND c.archived_at IS NULL
+      LEFT JOIN user_profiles up
+        ON up.user_id = ci.inviter_user_id
+      WHERE ci.invited_user_id = $1
+        ${statusFilter}
+      ORDER BY ci.created_at DESC, ci.id
+      LIMIT $${params.length - 1}
+      OFFSET $${params.length};
+    `,
+    params,
+  );
+
+  return {
+    invitations: result.rows.map((row) => ({
+      id: row.id,
+      status: row.status,
+      expiresAt: row.expires_at,
+      acceptedAt: row.accepted_at,
+      rejectedAt: row.rejected_at,
+      createdAt: row.created_at,
+      community: {
+        id: row.community_id,
+        name: row.community_name,
+        logoUrl: row.community_logo_url,
+      },
+      inviter: {
+        name: row.inviter_name,
+      },
+    })),
+    total: countResult.rows[0].total,
+  };
+}
+
 module.exports = {
+  MY_INVITATION_STATUSES,
+  listMyInvitations,
+
   createInvitation,
   getInvitationById,
   listInvitations,

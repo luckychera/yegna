@@ -1,4 +1,5 @@
 const { pool } = require('../../config/database');
+const { notifySafely } = require('../notification/notification.events');
 const { PAYMENT_STATUS, PAYMENT_STATUS_TRANSITIONS } = require('./payment.constants');
 const {
   validateAmount,
@@ -685,6 +686,43 @@ async function updatePaymentStatus(communityId, paymentId, nextStatus, actorUser
 
     await client.query('COMMIT');
 
+    const paymentNotifications = {
+      successful: {
+        type: 'payment_successful',
+        title: 'Payment successful',
+        message: `Your payment of ${updatedPayment.currency} ${updatedPayment.amount} was successful.`,
+      },
+      failed: {
+        type: 'payment_failed',
+        title: 'Payment failed',
+        message: `Your payment of ${updatedPayment.currency} ${updatedPayment.amount} failed. Please review the payment and try again if appropriate.`,
+      },
+      refunded: {
+        type: 'payment_refunded',
+        title: 'Payment refunded',
+        message: `Your payment of ${updatedPayment.currency} ${updatedPayment.amount} has been refunded.`,
+      },
+    };
+
+    const paymentNotification = paymentNotifications[nextStatus];
+
+    if (paymentNotification) {
+      await notifySafely({
+        userId: updatedPayment.user_id,
+        communityId,
+        ...paymentNotification,
+        entityType: 'payment',
+        entityId: updatedPayment.id,
+        metadata: {
+          paymentId: updatedPayment.id,
+          contributionId: updatedPayment.contribution_id,
+          amount: updatedPayment.amount,
+          currency: updatedPayment.currency,
+          status: updatedPayment.status,
+        },
+      });
+    }
+
     return updatedPayment;
   } catch (error) {
     await client.query('ROLLBACK');
@@ -716,7 +754,148 @@ async function refundPayment(communityId, paymentId, actorUserId) {
   return updatePaymentStatus(communityId, paymentId, PAYMENT_STATUS.REFUNDED, actorUserId);
 }
 
+// Payments are grouped into "this month" on the Ethiopian calendar day regardless
+// of the database session time zone.
+const PAYMENT_MONTH_START_SQL =
+  "DATE_TRUNC('month', NOW() AT TIME ZONE 'Africa/Addis_Ababa') AT TIME ZONE 'Africa/Addis_Ababa'";
+
+// The caller's own payments across communities. Provider internals (metadata,
+// provider transaction ID, raw failure text) are intentionally never selected, and
+// the checkout URL is only returned while a payment can still be completed.
+async function listMyPayments({ userId, status, communityId, contributionId, limit, offset }) {
+  const params = [userId];
+  const filters = ['pt.user_id = $1'];
+
+  if (status) {
+    params.push(status);
+    filters.push(`pt.status = $${params.length}`);
+  }
+
+  if (communityId) {
+    params.push(communityId);
+    filters.push(`pt.community_id = $${params.length}`);
+  }
+
+  if (contributionId) {
+    params.push(contributionId);
+    filters.push(`pt.contribution_id = $${params.length}`);
+  }
+
+  const where = filters.join(' AND ');
+
+  const summaryResult = await pool.query(
+    `
+      SELECT
+        pt.currency,
+        COUNT(*)::INT AS count,
+        COALESCE(SUM(pt.amount) FILTER (WHERE pt.status = 'successful'), 0) AS total_paid,
+        COALESCE(
+          SUM(pt.amount) FILTER (
+            WHERE pt.status = 'successful'
+              AND pt.completed_at >= ${PAYMENT_MONTH_START_SQL}
+          ),
+          0
+        ) AS paid_this_month,
+        COALESCE(
+          SUM(pt.amount) FILTER (WHERE pt.status IN ('pending', 'processing')),
+          0
+        ) AS pending_amount,
+        COALESCE(SUM(pt.amount) FILTER (WHERE pt.status = 'refunded'), 0) AS refunded_amount
+      FROM payment_transactions pt
+      WHERE ${where}
+      GROUP BY pt.currency
+      ORDER BY pt.currency;
+    `,
+    params,
+  );
+
+  const total = summaryResult.rows.reduce((sum, row) => sum + row.count, 0);
+
+  params.push(limit, offset);
+
+  const result = await pool.query(
+    `
+      SELECT
+        pt.id,
+        pt.community_id,
+        pt.contribution_id,
+        pt.provider,
+        pt.provider_reference,
+        pt.amount,
+        pt.currency,
+        pt.status,
+        pt.payment_method,
+        CASE
+          WHEN pt.status IN ('pending', 'processing') THEN pt.checkout_url
+          ELSE NULL
+        END AS checkout_url,
+        pt.initiated_at,
+        pt.completed_at,
+        pt.failed_at,
+        pt.created_at,
+        co.name AS community_name,
+        co.logo_url AS community_logo_url,
+        c.due_date AS contribution_due_date,
+        c.contribution_period_start,
+        c.contribution_period_end
+      FROM payment_transactions pt
+      JOIN communities co
+        ON co.id = pt.community_id
+      LEFT JOIN contributions c
+        ON c.id = pt.contribution_id
+      WHERE ${where}
+      ORDER BY pt.initiated_at DESC, pt.id
+      LIMIT $${params.length - 1}
+      OFFSET $${params.length};
+    `,
+    params,
+  );
+
+  return {
+    payments: result.rows.map((row) => ({
+      id: row.id,
+      communityId: row.community_id,
+      contributionId: row.contribution_id,
+      community: {
+        id: row.community_id,
+        name: row.community_name,
+        logoUrl: row.community_logo_url,
+      },
+      contribution: row.contribution_id
+        ? {
+            id: row.contribution_id,
+            dueDate: row.contribution_due_date,
+            periodStart: row.contribution_period_start,
+            periodEnd: row.contribution_period_end,
+          }
+        : null,
+      provider: row.provider,
+      providerReference: row.provider_reference,
+      amount: row.amount,
+      currency: row.currency,
+      status: row.status,
+      paymentMethod: row.payment_method,
+      checkoutUrl: row.checkout_url,
+      initiatedAt: row.initiated_at,
+      completedAt: row.completed_at,
+      failedAt: row.failed_at,
+      createdAt: row.created_at,
+    })),
+    summary: summaryResult.rows.map((row) => ({
+      currency: row.currency,
+      count: row.count,
+      totalPaid: row.total_paid,
+      paidThisMonth: row.paid_this_month,
+      pendingAmount: row.pending_amount,
+      refundedAmount: row.refunded_amount,
+    })),
+    total,
+  };
+}
+
 module.exports = {
+  listMyPayments,
+
   ensureCommunityExists,
   ensureUserExists,
   ensureCommunityMembership,

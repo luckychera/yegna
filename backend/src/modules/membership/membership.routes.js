@@ -15,6 +15,8 @@ const {
   reject,
   suspend,
   remove,
+  join,
+  leave,
 } = require('./membership.controller');
 
 const router = express.Router();
@@ -74,5 +76,11 @@ router.post(
   requirePermission(PERMISSIONS.MEMBERS_REMOVE),
   remove,
 );
+
+// Self-service membership: any authenticated user acting on their own membership.
+// Business rules (approval, transitions) are enforced by the membership service.
+router.post('/:communityId/join', authenticate, join);
+
+router.post('/:communityId/leave', authenticate, leave);
 
 module.exports = router;

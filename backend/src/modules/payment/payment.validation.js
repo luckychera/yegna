@@ -1,3 +1,8 @@
+const { parsePagination } = require('../../utils/pagination');
+const {
+  parseEnumFilter,
+  parseUuidFilter,
+} = require('../../utils/query-filters');
 const {
   PAYMENT_CURRENCY_DEFAULT,
   PAYMENT_METHOD,
@@ -145,7 +150,18 @@ function validatePaymentMethodValue(paymentMethod) {
   return paymentMethod;
 }
 
+function validateListMyPaymentsQuery(query = {}) {
+  return {
+    ...parsePagination(query),
+    status: parseEnumFilter(query.status, Object.values(PAYMENT_STATUS), 'status'),
+    communityId: parseUuidFilter(query.communityId, 'communityId'),
+    contributionId: parseUuidFilter(query.contributionId, 'contributionId'),
+  };
+}
+
 module.exports = {
+  validateListMyPaymentsQuery,
+
   createValidationError,
   validateUuid,
   validateAmount,

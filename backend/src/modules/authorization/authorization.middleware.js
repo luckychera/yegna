@@ -1,4 +1,5 @@
 const { getUserCommunityAuthorization } = require('./authorization.service');
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function requirePermission(permission) {
   return async (req, res, next) => {
@@ -21,6 +22,16 @@ function requirePermission(permission) {
           error: {
             code: 'COMMUNITY_ID_REQUIRED',
             message: 'Community ID is required',
+          },
+        });
+      }
+
+      if (!UUID_REGEX.test(communityId)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_COMMUNITY_ID',
+            message: 'Community ID must be a valid UUID.',
           },
         });
       }
@@ -77,6 +88,16 @@ function requireRole(roleName) {
           error: {
             code: 'COMMUNITY_ID_REQUIRED',
             message: 'Community ID is required',
+          },
+        });
+      }
+
+      if (!UUID_REGEX.test(communityId)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_COMMUNITY_ID',
+            message: 'Community ID must be a valid UUID.',
           },
         });
       }

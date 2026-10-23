@@ -21,67 +21,63 @@ const router = express.Router();
 router.use(authenticate);
 
 // View payments
-router.get(
-  '/communities/:communityId/payments',
-  requirePermission('payments.view'),
-  listPaymentsController,
-);
+router.get('/:communityId/payments', requirePermission('payments.view'), listPaymentsController);
 
 router.get(
-  '/communities/:communityId/payments/:paymentId',
+  '/:communityId/payments/:paymentId',
   requirePermission('payments.view'),
   getPaymentController,
 );
 
 // Create payment
 router.post(
-  '/communities/:communityId/payments',
+  '/:communityId/payments',
   requirePermission('payments.create'),
   createPaymentController,
 );
 
 // Initialize payment with external provider
 router.post(
-  '/communities/:communityId/payments/:paymentId/initialize',
+  '/:communityId/payments/:paymentId/initialize',
   requirePermission('payments.create'),
   initializeProviderPaymentController,
 );
 
 // Payment lifecycle
 router.post(
-  '/communities/:communityId/payments/:paymentId/process',
+  '/:communityId/payments/:paymentId/process',
   requirePermission('payments.create'),
   processPaymentController,
 );
 
 router.post(
-  '/communities/:communityId/payments/:paymentId/success',
+  '/:communityId/payments/:paymentId/success',
   requirePermission('payments.create'),
   successfulPaymentController,
 );
 
 router.post(
-  '/communities/:communityId/payments/:paymentId/fail',
+  '/:communityId/payments/:paymentId/fail',
   requirePermission('payments.create'),
   failedPaymentController,
 );
 
 router.post(
-  '/communities/:communityId/payments/:paymentId/cancel',
+  '/:communityId/payments/:paymentId/cancel',
   requirePermission('payments.create'),
   cancelPaymentController,
 );
 
 // Generic status update
 router.patch(
-  '/communities/:communityId/payments/:paymentId/status',
+  '/:communityId/payments/:paymentId/status',
   requirePermission('payments.create'),
   updatePaymentStatusController,
 );
 
 // Refund
 router.post(
-  '/communities/:communityId/payments/:paymentId/refund',
+  '/:communityId/payments/:paymentId/refund',
   requirePermission('payments.refund'),
   refundPaymentController,
 );

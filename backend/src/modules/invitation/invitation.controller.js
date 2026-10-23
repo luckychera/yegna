@@ -5,7 +5,14 @@ const {
   acceptInvitation,
   rejectInvitation,
   revokeInvitation,
+  listMyInvitations,
 } = require('./invitation.service');
+
+const {
+  validateInvitationId,
+  validateListMyInvitationsQuery,
+} = require('./invitation.validation');
+const { buildPagination } = require('../../utils/pagination');
 
 function getRequestContext(req) {
   return {
@@ -41,10 +48,7 @@ async function list(req, res, next) {
     const { communityId } = req.params;
     const { status } = req.query;
 
-    const invitations = await listInvitations({
-      communityId,
-      status,
-    });
+    const invitations = await listInvitations(communityId, status);
 
     return res.status(200).json({
       success: true,
@@ -57,9 +61,11 @@ async function list(req, res, next) {
 
 async function getById(req, res, next) {
   try {
-    const { invitationId } = req.params;
+    const { communityId, invitationId } = req.params;
 
-    const invitation = await getInvitationById(invitationId);
+    validateInvitationId(invitationId);
+
+    const invitation = await getInvitationById(communityId, invitationId);
 
     return res.status(200).json({
       success: true,
@@ -92,6 +98,8 @@ async function reject(req, res, next) {
   try {
     const { invitationId } = req.params;
 
+    validateInvitationId(invitationId);
+
     const invitation = await rejectInvitation(
       invitationId,
       req.user.id,
@@ -108,12 +116,12 @@ async function reject(req, res, next) {
 
 async function revoke(req, res, next) {
   try {
-    const { invitationId } = req.params;
+    const { communityId, invitationId } = req.params;
 
-    const invitation = await revokeInvitation(
-      invitationId,
-      req.user.id,
-    );
+    validateInvitationId(invitationId);
+
+    // communityId scopes the revoke to the community the permission was checked for.
+    const invitation = await revokeInvitation(invitationId, req.user.id, communityId);
 
     return res.status(200).json({
       success: true,
@@ -124,7 +132,56 @@ async function revoke(req, res, next) {
   }
 }
 
+async function listMine(req, res, next) {
+  try {
+    const query = validateListMyInvitationsQuery(req.query);
+
+    const { invitations, total } = await listMyInvitations({
+      userId: req.user.id,
+      ...query,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        invitations,
+      },
+      pagination: buildPagination({
+        limit: query.limit,
+        offset: query.offset,
+        count: invitations.length,
+        total,
+      }),
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function acceptById(req, res, next) {
+  try {
+    const { invitationId } = req.params;
+
+    validateInvitationId(invitationId);
+
+    const result = await acceptInvitation({
+      invitationId,
+      invitedUserId: req.user.id,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
+  listMine,
+  acceptById,
+
   create,
   list,
   getById,

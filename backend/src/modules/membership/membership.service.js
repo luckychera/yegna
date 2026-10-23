@@ -1,6 +1,8 @@
 const { pool } = require('../../config/database');
 const { createAuditLog } = require('../audit/audit.service');
 const { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } = require('../audit/audit.constants');
+const { NOTIFICATION_TYPE } = require('../notification/notification.constants');
+const { notifySafely } = require('../notification/notification.events');
 
 function createMembershipError(message, statusCode, code) {
   const error = new Error(message);
@@ -181,7 +183,7 @@ async function createMembership({
       : settings.membershipRequiresApproval
         ? 'pending'
         : 'active';
-        
+
   const client = providedClient || (await pool.connect());
   const ownsTransaction = !providedClient;
 
@@ -576,6 +578,7 @@ async function changeMembershipStatus(communityId, membershipId, newStatus, acto
     );
 
     const membership = result.rows[0];
+    const previousStatus = membership.status;
 
     const auditAction =
       current.status === 'suspended' && newStatus === 'active'
@@ -610,6 +613,47 @@ async function changeMembershipStatus(communityId, membershipId, newStatus, acto
 
     await client.query('COMMIT');
 
+    const notification = {
+      active:
+        previousStatus === 'pending'
+          ? {
+              type: NOTIFICATION_TYPE.MEMBERSHIP_APPROVED,
+              title: 'Membership approved',
+              message: 'Your membership application has been approved.',
+            }
+          : null,
+
+      suspended: {
+        type: NOTIFICATION_TYPE.MEMBERSHIP_SUSPENDED,
+        title: 'Membership suspended',
+        message: 'Your membership has been suspended.',
+      },
+
+      left: {
+        type: NOTIFICATION_TYPE.MEMBERSHIP_REMOVED,
+        title: 'Membership removed',
+        message: 'Your membership has been removed from the community.',
+      },
+    }[newStatus];
+
+    if (notification) {
+      await notifySafely({
+        userId: membership.user_id,
+        communityId: membership.community_id,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        entityType: 'membership',
+        entityId: membership.id,
+        metadata: {
+          communityId: membership.community_id,
+          membershipId: membership.id,
+          previousStatus,
+          status: membership.status,
+        },
+      });
+    }
+
     return membership;
   } catch (error) {
     await client.query('ROLLBACK');
@@ -619,7 +663,66 @@ async function changeMembershipStatus(communityId, membershipId, newStatus, acto
   }
 }
 
+// Self-service join. Delegates to createMembership so approval settings, rejoin
+// handling, auditing and duplicate checks stay exactly as they are for invitations
+// and admin-created memberships. The only addition is refusing non-active communities.
+async function joinCommunity({ communityId, userId }) {
+  const community = await ensureCommunityExists(communityId);
+
+  if (community.status !== 'active') {
+    throw createMembershipError(
+      'This community is not accepting new members',
+      409,
+      'COMMUNITY_NOT_JOINABLE',
+    );
+  }
+
+  try {
+    return await createMembership({
+      communityId,
+      userId,
+      metadata: { source: 'self_join' },
+      actorUserId: userId,
+    });
+  } catch (error) {
+    // Two simultaneous join requests can both pass the existing-row check; the
+    // unique (community_id, user_id) constraint is the final guard.
+    if (error.code === '23505') {
+      throw createMembershipError(
+        'User already has a membership in this community',
+        409,
+        'MEMBERSHIP_ALREADY_EXISTS',
+      );
+    }
+
+    throw error;
+  }
+}
+
+// Self-service leave. Delegates to changeMembershipStatus so the existing status
+// transitions, auditing and notifications apply unchanged.
+async function leaveCommunity({ communityId, userId }) {
+  const result = await pool.query(
+    `
+      SELECT id
+      FROM community_memberships
+      WHERE community_id = $1
+        AND user_id = $2;
+    `,
+    [communityId, userId],
+  );
+
+  if (result.rows.length === 0) {
+    throw createMembershipError('Membership not found', 404, 'MEMBERSHIP_NOT_FOUND');
+  }
+
+  return changeMembershipStatus(communityId, result.rows[0].id, 'left', userId);
+}
+
 module.exports = {
+  joinCommunity,
+  leaveCommunity,
+
   listMembers,
   getMembershipById,
   createMembership,

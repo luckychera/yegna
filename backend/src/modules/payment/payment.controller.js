@@ -1,10 +1,14 @@
+const { buildPagination } = require('../../utils/pagination');
+
 const {
+  validateListMyPaymentsQuery,
   validateCreatePaymentInput,
   validatePaymentId,
   validatePaymentStatus,
 } = require('./payment.validation');
 
 const {
+  listMyPayments,
   listPayments,
   getPaymentById,
   createPayment,
@@ -209,7 +213,36 @@ async function updatePaymentStatusController(req, res, next) {
   }
 }
 
+async function listMyPaymentsController(req, res, next) {
+  try {
+    const query = validateListMyPaymentsQuery(req.query);
+
+    const { payments, summary, total } = await listMyPayments({
+      userId: req.user.id,
+      ...query,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        payments,
+        summary,
+      },
+      pagination: buildPagination({
+        limit: query.limit,
+        offset: query.offset,
+        count: payments.length,
+        total,
+      }),
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
+  listMyPaymentsController,
+
   createPaymentController,
   initializeProviderPaymentController,
   listPaymentsController,

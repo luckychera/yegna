@@ -2,6 +2,7 @@ const { pool } = require('../../config/database');
 const { createAuditLog } = require('../audit/audit.service');
 const { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } = require('../audit/audit.constants');
 const { CONTRIBUTION_STATUS } = require('./contribution.constants');
+const { notifySafely } = require('../notification/notification.events');
 
 function createContributionError(message, statusCode, code) {
   const error = new Error(message);
@@ -175,7 +176,7 @@ async function createContribution({
   actorUserId,
 }) {
   await ensureCommunityExists(communityId);
-  await ensureActiveMembership(communityId, membershipId);
+  const membership = await ensureActiveMembership(communityId, membershipId);
 
   const client = await pool.connect();
 
@@ -276,6 +277,22 @@ async function createContribution({
     });
 
     await client.query('COMMIT');
+
+    await notifySafely({
+      userId: membership.user_id,
+      communityId,
+      type: 'contribution_created',
+      title: 'New contribution assigned',
+      message: `A contribution of ${contribution.currency} ${contribution.amount} has been assigned to you.`,
+      entityType: 'contribution',
+      entityId: contribution.id,
+      metadata: {
+        contributionId: contribution.id,
+        dueDate: contribution.due_date,
+        amount: contribution.amount,
+        currency: contribution.currency,
+      },
+    });
 
     return contribution;
   } catch (error) {
@@ -499,7 +516,159 @@ async function changeContributionStatus(communityId, contributionId, status, act
   }
 }
 
+// Contributions are due on an Ethiopian calendar day, so "past due" is evaluated in
+// Africa/Addis_Ababa regardless of the database session time zone.
+const TODAY_IN_ETHIOPIA_SQL = "(NOW() AT TIME ZONE 'Africa/Addis_Ababa')::DATE";
+
+// Unpaid contributions whose due date has passed. The stored status is only moved
+// to "overdue" by explicit status changes, so this is derived for display purposes.
+const IS_PAST_DUE_SQL = `(
+  c.status = 'overdue'
+  OR (c.status IN ('pending', 'partially_paid') AND c.due_date < ${TODAY_IN_ETHIOPIA_SQL})
+)`;
+
+const OUTSTANDING_AMOUNT_SQL = 'GREATEST(c.amount - c.paid_amount - c.waived_amount, 0)';
+
+// The caller's own contributions across every community they have a membership in.
+// Amounts are returned as decimal strings to avoid floating point money errors.
+async function listMyContributions({
+  userId,
+  status,
+  communityId,
+  dueFrom,
+  dueTo,
+  limit,
+  offset,
+}) {
+  const params = [userId];
+  const filters = ['cm.user_id = $1'];
+
+  if (status) {
+    params.push(status);
+    filters.push(`c.status = $${params.length}`);
+  }
+
+  if (communityId) {
+    params.push(communityId);
+    filters.push(`c.community_id = $${params.length}`);
+  }
+
+  if (dueFrom) {
+    params.push(dueFrom);
+    filters.push(`c.due_date >= $${params.length}::DATE`);
+  }
+
+  if (dueTo) {
+    params.push(dueTo);
+    filters.push(`c.due_date <= $${params.length}::DATE`);
+  }
+
+  const where = filters.join(' AND ');
+
+  const summaryResult = await pool.query(
+    `
+      SELECT
+        c.currency,
+        COUNT(*)::INT AS count,
+        COALESCE(SUM(c.amount), 0) AS total_amount,
+        COALESCE(SUM(c.paid_amount), 0) AS paid_amount,
+        COALESCE(
+          SUM(${OUTSTANDING_AMOUNT_SQL})
+            FILTER (WHERE c.status IN ('pending', 'partially_paid', 'overdue')),
+          0
+        ) AS outstanding_amount,
+        COUNT(*) FILTER (
+          WHERE c.status IN ('pending', 'partially_paid') AND NOT ${IS_PAST_DUE_SQL}
+        )::INT AS pending_count,
+        COUNT(*) FILTER (WHERE ${IS_PAST_DUE_SQL})::INT AS overdue_count
+      FROM contributions c
+      JOIN community_memberships cm
+        ON cm.id = c.membership_id
+      WHERE ${where}
+      GROUP BY c.currency
+      ORDER BY c.currency;
+    `,
+    params,
+  );
+
+  const total = summaryResult.rows.reduce((sum, row) => sum + row.count, 0);
+
+  params.push(limit, offset);
+
+  const result = await pool.query(
+    `
+      SELECT
+        c.id,
+        c.community_id,
+        c.membership_id,
+        c.contribution_period_start,
+        c.contribution_period_end,
+        c.due_date,
+        c.amount,
+        c.currency,
+        c.status,
+        c.paid_amount,
+        c.waived_amount,
+        c.penalty_amount,
+        ${OUTSTANDING_AMOUNT_SQL} AS outstanding_amount,
+        ${IS_PAST_DUE_SQL} AS is_past_due,
+        c.notes,
+        c.created_at,
+        co.name AS community_name,
+        co.logo_url AS community_logo_url
+      FROM contributions c
+      JOIN community_memberships cm
+        ON cm.id = c.membership_id
+      JOIN communities co
+        ON co.id = c.community_id
+      WHERE ${where}
+      ORDER BY c.due_date DESC, c.created_at DESC, c.id
+      LIMIT $${params.length - 1}
+      OFFSET $${params.length};
+    `,
+    params,
+  );
+
+  return {
+    contributions: result.rows.map((row) => ({
+      id: row.id,
+      communityId: row.community_id,
+      membershipId: row.membership_id,
+      community: {
+        id: row.community_id,
+        name: row.community_name,
+        logoUrl: row.community_logo_url,
+      },
+      periodStart: row.contribution_period_start,
+      periodEnd: row.contribution_period_end,
+      dueDate: row.due_date,
+      amount: row.amount,
+      currency: row.currency,
+      status: row.status,
+      isOverdue: row.is_past_due,
+      paidAmount: row.paid_amount,
+      waivedAmount: row.waived_amount,
+      penaltyAmount: row.penalty_amount,
+      outstandingAmount: row.outstanding_amount,
+      notes: row.notes,
+      createdAt: row.created_at,
+    })),
+    summary: summaryResult.rows.map((row) => ({
+      currency: row.currency,
+      count: row.count,
+      totalAmount: row.total_amount,
+      paidAmount: row.paid_amount,
+      outstandingAmount: row.outstanding_amount,
+      pendingCount: row.pending_count,
+      overdueCount: row.overdue_count,
+    })),
+    total,
+  };
+}
+
 module.exports = {
+  listMyContributions,
+
   listContributions,
   getContributionById,
   createContribution,

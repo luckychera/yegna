@@ -9,6 +9,11 @@ const membershipRoutes = require('../modules/membership/membership.routes');
 const invitationRoutes = require('../modules/invitation/invitation.routes');
 const contributionRoutes = require('../modules/contribution/contribution.routes');
 const paymentRoutes = require('../modules/payment/payment.routes');
+const contributionMeRoutes = require('../modules/contribution/contribution.me.routes');
+const paymentMeRoutes = require('../modules/payment/payment.me.routes');
+const usersRoutes = require('../modules/users/users.routes');
+const reportingRoutes = require('../modules/reporting/reporting.routes');
+const notificationRoutes = require('../modules/notification/notification.routes');
 
 const router = express.Router();
 
@@ -18,8 +23,14 @@ router.use('/identity', identityRoutes);
 router.use('/authorization', authorizationRoutes);
 router.use('/communities', communityRoutes);
 router.use('/communities', membershipRoutes);
-router.use('/communities', invitationRoutes);
+// invitation.routes.js declares full paths (/communities/:id/invitations, /invitations/...).
+router.use('/', invitationRoutes);
 router.use('/communities', contributionRoutes);
-router.use(paymentRoutes);
+router.use('/communities', paymentRoutes);
+router.use('/contributions', contributionMeRoutes);
+router.use('/payments', paymentMeRoutes);
+router.use('/users', usersRoutes);
+router.use('/reports', reportingRoutes);
+router.use('/notifications', notificationRoutes);
 
 module.exports = router;

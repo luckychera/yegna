@@ -16,6 +16,7 @@ const {
 } = require('../src/modules/contribution/contribution.service');
 
 const { CONTRIBUTION_STATUS } = require('../src/modules/contribution/contribution.constants');
+const { NOTIFICATION_TYPE } = require('../src/modules/notification/notification.constants');
 
 function uniqueEmail(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@yegna.test`;
@@ -157,6 +158,35 @@ test('creates a contribution for an active member', async () => {
     assert.equal(contribution.status, CONTRIBUTION_STATUS.PENDING);
     assert.equal(contribution.paid_amount, '0.00');
     assert.equal(contribution.notes, 'October community contribution');
+
+    const notificationResult = await pool.query(
+      `SELECT *
+       FROM notifications
+       WHERE user_id = $1
+         AND type = $2
+         AND entity_id = $3`,
+      [
+        fixture.member.id,
+        NOTIFICATION_TYPE.CONTRIBUTION_CREATED,
+        contribution.id,
+      ],
+    );
+
+    assert.equal(
+      notificationResult.rowCount,
+      1,
+      'creating a contribution should notify its assigned member exactly once',
+    );
+
+    const notification = notificationResult.rows[0];
+
+    assert.equal(notification.user_id, fixture.member.id);
+    assert.equal(notification.community_id, fixture.community.id);
+    assert.equal(notification.title, 'New contribution assigned');
+    assert.equal(notification.entity_type, 'contribution');
+    assert.equal(notification.metadata.contributionId, contribution.id);
+    assert.equal(notification.metadata.amount, contribution.amount);
+    assert.equal(notification.metadata.currency, contribution.currency);
   } finally {
     await cleanupFixture(fixture);
   }
