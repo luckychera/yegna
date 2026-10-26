@@ -1,8 +1,20 @@
-# 🌍 Digital Community
+| 👤 Full Name | 🆔 CTC Number | 🏫 Classroom |
+| ------------ | ------------- | -----------: |
+| Chera Tolosa | CTC-716-26    |            2 |
 
-> **Digital infrastructure for stronger, smarter, and more connected communities.**
+<div align="center">
+  <img src="./yegna_logo.png" alt="Renite Logo" width="280" style="border-radius: 8px;" />
 
-Digital Community is a full-stack platform designed to **digitize and modernize how communities and local organizations in Ethiopia organize, communicate, manage members, handle contributions, and coordinate community activities**.
+  <h1>
+    <strong>YEGNA</strong>
+    <br>
+    <sub>🇪🇹 Digital infrastructure for stronger, smarter, and more connected communities.</sub>
+  </h1>
+</div>
+
+---
+
+**YEGNA** Community is a full-stack platform designed to **digitize and modernize how communities and local organizations in Ethiopia organize, communicate, manage members, handle contributions, and coordinate community activities**.
 
 The platform is inspired by traditional Ethiopian community structures such as **Equb, Edir, and Mahiber**, while being designed as a **general-purpose community operating platform** that can support many different types of organizations and groups.
 
