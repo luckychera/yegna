@@ -31,6 +31,7 @@ function validateCreateCommunityInput(input) {
     description,
     communityType,
     logoUrl,
+    bannerUrl,
   } = input;
 
   if (!name || typeof name !== 'string' || !name.trim()) {
@@ -83,16 +84,41 @@ function validateCreateCommunityInput(input) {
     }
   }
 
+  if (bannerUrl !== undefined && bannerUrl !== null) {
+    if (typeof bannerUrl !== 'string') {
+      throw createValidationError(
+        'Community banner URL must be a string',
+        'INVALID_COMMUNITY_BANNER_URL',
+      );
+    }
+  }
+
   return {
     name: name.trim(),
     description: description?.trim() || null,
     communityType,
     logoUrl: logoUrl?.trim() || null,
+    bannerUrl: bannerUrl?.trim() || null,
   };
 }
 
 function validateUpdateCommunityInput(input) {
-  const { name, description, communityType, logoUrl } = input;
+  const {
+    name,
+    description,
+    communityType,
+    logoUrl,
+    bannerUrl,
+  } = input;
+
+  if (bannerUrl !== undefined && bannerUrl !== null) {
+    if (typeof bannerUrl !== 'string') {
+      throw createValidationError(
+        'Community banner URL must be a string',
+        'INVALID_COMMUNITY_BANNER_URL',
+      );
+    }
+  }
 
   if (name !== undefined) {
     if (typeof name !== 'string' || !name.trim()) {
@@ -144,7 +170,8 @@ function validateUpdateCommunityInput(input) {
     name === undefined &&
     description === undefined &&
     communityType === undefined &&
-    logoUrl === undefined
+    logoUrl === undefined &&
+    bannerUrl === undefined
   ) {
     throw createValidationError(
       'At least one community field must be provided',
@@ -159,6 +186,9 @@ function validateUpdateCommunityInput(input) {
       : {}),
     ...(communityType !== undefined ? { communityType } : {}),
     ...(logoUrl !== undefined ? { logoUrl: logoUrl?.trim() || null } : {}),
+    ...(bannerUrl !== undefined
+      ? { bannerUrl: bannerUrl.trim() || null }
+      : {}),
   };
 }
 

@@ -11,6 +11,7 @@ test.before(() => ctx.start());
 test.after(() => ctx.cleanup());
 
 const SUMMARY_KEYS = [
+  'bannerUrl',
   'communityType',
   'createdAt',
   'description',
@@ -312,4 +313,77 @@ test('GET /communities/me excludes archived communities', async () => {
   const response = await ctx.request('GET', '/communities/me', { token: admin.token });
 
   assert.deepEqual(response.body.data.memberships, []);
+});
+
+test('GET /communities returns and PATCH /communities/:communityId persists banner URL', async () => {
+  const admin = await ctx.createUser();
+  const prefix = unique('banner');
+  const bannerUrl = 'https://example.com/yegna-community-banner.jpg';
+
+  const community = await ctx.createTestCommunity(admin, {
+    name: `${prefix} Community`,
+  });
+
+  const update = await ctx.request('PATCH', `/communities/${community.id}`, {
+    token: admin.token,
+    body: {
+      bannerUrl,
+    },
+  });
+
+  assert.equal(update.status, 200);
+  assert.equal(update.body.success, true);
+  assert.equal(update.body.data.community.banner_url, bannerUrl);
+
+  const detail = await ctx.request('GET', `/communities/${community.id}`, {
+    token: admin.token,
+  });
+
+  assert.equal(detail.status, 200);
+  assert.equal(detail.body.data.community.banner_url, bannerUrl);
+
+  const list = await listCommunities(admin, { q: prefix });
+
+  assert.equal(list.status, 200);
+  assert.equal(list.body.data.communities[0].bannerUrl, bannerUrl);
+});
+
+test('PATCH /communities/:communityId rejects a non-string banner URL', async () => {
+  const admin = await ctx.createUser();
+  const community = await ctx.createTestCommunity(admin);
+
+  const response = await ctx.request('PATCH', `/communities/${community.id}`, {
+    token: admin.token,
+    body: {
+      bannerUrl: 12345,
+    },
+  });
+
+  assert.equal(response.status, 400);
+  assert.equal(response.body.error.code, 'INVALID_COMMUNITY_BANNER_URL');
+});
+
+test('PATCH /communities/:communityId allows clearing the banner URL', async () => {
+  const admin = await ctx.createUser();
+  const community = await ctx.createTestCommunity(admin);
+
+  const setBanner = await ctx.request('PATCH', `/communities/${community.id}`, {
+    token: admin.token,
+    body: {
+      bannerUrl: 'https://example.com/banner.jpg',
+    },
+  });
+
+  assert.equal(setBanner.status, 200);
+  assert.equal(setBanner.body.data.community.banner_url, 'https://example.com/banner.jpg');
+
+  const clearBanner = await ctx.request('PATCH', `/communities/${community.id}`, {
+    token: admin.token,
+    body: {
+      bannerUrl: '',
+    },
+  });
+
+  assert.equal(clearBanner.status, 200);
+  assert.equal(clearBanner.body.data.community.banner_url, null);
 });

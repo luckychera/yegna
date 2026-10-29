@@ -94,6 +94,118 @@ async function getCurrentUserProfile(userId) {
   };
 }
 
+async function updateCurrentUserProfile(userId, updates) {
+  const columnMap = {
+    firstName: 'first_name',
+    middleName: 'middle_name',
+    lastName: 'last_name',
+    displayName: 'display_name',
+    avatarUrl: 'avatar_url',
+    preferredLanguage: 'preferred_language',
+    timezone: 'timezone',
+  };
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const userResult = await client.query(
+      `
+        SELECT id
+        FROM users
+        WHERE id = $1
+          AND deleted_at IS NULL
+        FOR UPDATE;
+      `,
+      [userId],
+    );
+
+    if (userResult.rows.length === 0) {
+      throw createUserError('User not found', 404, 'USER_NOT_FOUND');
+    }
+
+    const profileResult = await client.query(
+      `
+        SELECT *
+        FROM user_profiles
+        WHERE user_id = $1
+        FOR UPDATE;
+      `,
+      [userId],
+    );
+
+    if (profileResult.rows.length === 0) {
+      if (!updates.firstName || !updates.lastName) {
+        throw createUserError(
+          'First name and last name are required to create a profile',
+          400,
+          'PROFILE_NAMES_REQUIRED',
+        );
+      }
+
+      await client.query(
+        `
+          INSERT INTO user_profiles (
+            user_id,
+            first_name,
+            middle_name,
+            last_name,
+            display_name,
+            avatar_url,
+            preferred_language,
+            timezone
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+        `,
+        [
+          userId,
+          updates.firstName,
+          updates.middleName ?? null,
+          updates.lastName,
+          updates.displayName ?? null,
+          updates.avatarUrl ?? null,
+          updates.preferredLanguage ?? 'en',
+          updates.timezone ?? 'Africa/Addis_Ababa',
+        ],
+      );
+    } else {
+      const fields = [];
+      const values = [];
+
+      for (const [key, column] of Object.entries(columnMap)) {
+        if (Object.prototype.hasOwnProperty.call(updates, key)) {
+          fields.push(`${column} = $${values.length + 1}`);
+          values.push(updates[key]);
+        }
+      }
+
+      if (fields.length > 0) {
+        values.push(userId);
+
+        await client.query(
+          `
+            UPDATE user_profiles
+            SET ${fields.join(', ')}
+            WHERE user_id = $${values.length};
+          `,
+          values,
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return getCurrentUserProfile(userId);
+}
+
 module.exports = {
   getCurrentUserProfile,
+  updateCurrentUserProfile,
 };

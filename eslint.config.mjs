@@ -37,6 +37,9 @@ export default [
       ...tseslint.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': 'warn',
+      // TypeScript handles undefined identifiers and unused variables.
+      'no-undef': 'off',
+      'no-unused-vars': 'off',
     },
   },
   {
@@ -84,6 +87,7 @@ export default [
         console: 'readonly',
         process: 'readonly',
         Buffer: 'readonly',
+        URL: 'readonly',
         __dirname: 'readonly',
         module: 'readonly',
         require: 'readonly',

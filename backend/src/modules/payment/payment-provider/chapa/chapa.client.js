@@ -42,7 +42,13 @@ class ChapaClient {
     }
 
     if (!response.ok) {
-      const error = new Error(body?.message || 'Chapa payment request failed');
+     const message = body?.message;
+
+const error = new Error(
+  typeof message === 'string'
+    ? message
+    : JSON.stringify(message || 'Chapa payment request failed'),
+);
 
       error.statusCode = response.status >= 500 ? 502 : response.status;
       error.code = 'CHAPA_API_ERROR';

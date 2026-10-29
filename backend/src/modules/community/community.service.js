@@ -15,6 +15,7 @@ async function createCommunity({
   description,
   communityType,
   logoUrl,
+  bannerUrl,
 }) {
   const client = await pool.connect();
 
@@ -29,9 +30,10 @@ async function createCommunity({
           community_type,
           status,
           created_by,
-          logo_url
+          logo_url,
+          banner_url
         )
-        VALUES ($1, $2, $3, 'active', $4, $5)
+        VALUES ($1, $2, $3, 'active', $4, $5, $6)
         RETURNING
           id,
           name,
@@ -40,11 +42,12 @@ async function createCommunity({
           status,
           created_by,
           logo_url,
+          banner_url,
           settings,
           created_at,
           updated_at;
       `,
-      [name, description, communityType, userId, logoUrl],
+      [name, description, communityType, userId, logoUrl, bannerUrl],
     );
 
     const community = communityResult.rows[0];
@@ -182,6 +185,7 @@ async function getCommunityById(communityId) {
         status,
         created_by,
         logo_url,
+        banner_url,
         settings,
         created_at,
         updated_at,
@@ -214,6 +218,7 @@ async function updateCommunity(communityId, updates) {
     description: 'description',
     communityType: 'community_type',
     logoUrl: 'logo_url',
+    bannerUrl: 'banner_url',
   };
 
   for (const [key, column] of Object.entries(fieldMap)) {
@@ -240,6 +245,7 @@ async function updateCommunity(communityId, updates) {
         status,
         created_by,
         logo_url,
+        banner_url,
         settings,
         created_at,
         updated_at,
@@ -273,6 +279,7 @@ function toCommunitySummary(row) {
     communityType: row.community_type,
     status: row.status,
     logoUrl: row.logo_url,
+    bannerUrl: row.banner_url,
     memberCount: row.member_count,
     createdAt: row.created_at,
   };
@@ -319,6 +326,7 @@ async function listCommunities({ userId, search, communityType, sort = 'newest',
         c.community_type,
         c.status,
         c.logo_url,
+        c.banner_url,
         c.created_at,
         (
           SELECT COUNT(*)::INT
@@ -377,6 +385,7 @@ async function listMyCommunities({ userId, statuses, limit, offset }) {
         c.community_type,
         c.status,
         c.logo_url,
+        c.banner_url,
         c.created_at,
         (
           SELECT COUNT(*)::INT
