@@ -113,14 +113,7 @@ async function getUserCommunityAuthorization(userId, communityId) {
   const membership = result.rows[0];
 
   if (!membership) {
-    return {
-      communityId,
-      membershipId: null,
-      membershipNumber: null,
-      membershipStatus: null,
-      roles: [],
-      permissions: [],
-    };
+    return null;
   }
 
   const roles = [];

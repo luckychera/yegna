@@ -3,7 +3,16 @@ const express = require('express');
 const { authenticate } = require('../auth/auth.middleware');
 const { requirePermission } = require('../../middleware/authorization.middleware');
 
-const { create, list, getById, accept, reject, revoke } = require('./invitation.controller');
+const {
+  create,
+  list,
+  getById,
+  accept,
+  reject,
+  revoke,
+  listMine,
+  acceptById,
+} = require('./invitation.controller');
 
 const router = express.Router();
 
@@ -37,7 +46,12 @@ router.post(
 );
 
 // Member invitation actions
+// "/invitations/me" must stay above any "/invitations/:invitationId" route.
+router.get('/invitations/me', authenticate, listMine);
+
 router.post('/invitations/accept', authenticate, accept);
+
+router.post('/invitations/:invitationId/accept', authenticate, acceptById);
 
 router.post('/invitations/:invitationId/reject', authenticate, reject);
 

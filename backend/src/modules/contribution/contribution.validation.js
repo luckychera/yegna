@@ -1,3 +1,9 @@
+const { parsePagination } = require('../../utils/pagination');
+const {
+  parseEnumFilter,
+  parseUuidFilter,
+  parseDateFilter,
+} = require('../../utils/query-filters');
 const {
   CONTRIBUTION_STATUS,
   CONTRIBUTION_FREQUENCY,
@@ -177,7 +183,29 @@ function validateFrequency(frequency) {
   return frequency;
 }
 
+function validateListMyContributionsQuery(query = {}) {
+  const dueFrom = parseDateFilter(query.dueFrom, 'dueFrom');
+  const dueTo = parseDateFilter(query.dueTo, 'dueTo');
+
+  if (dueFrom && dueTo && dueFrom > dueTo) {
+    const error = new Error('dueFrom must not be after dueTo');
+    error.statusCode = 400;
+    error.code = 'VALIDATION_ERROR';
+    throw error;
+  }
+
+  return {
+    ...parsePagination(query),
+    status: parseEnumFilter(query.status, Object.values(CONTRIBUTION_STATUS), 'status'),
+    communityId: parseUuidFilter(query.communityId, 'communityId'),
+    dueFrom,
+    dueTo,
+  };
+}
+
 module.exports = {
+  validateListMyContributionsQuery,
+
   validateCreateContributionInput,
   validateUpdateContributionInput,
   validateContributionId,

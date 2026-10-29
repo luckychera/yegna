@@ -1,3 +1,10 @@
+const { parsePagination } = require('../../utils/pagination');
+const {
+  parseEnumFilter,
+  parseSearchFilter,
+} = require('../../utils/query-filters');
+const { MEMBERSHIP_STATUSES } = require('../membership/membership.validation');
+
 const COMMUNITY_TYPES = Object.freeze([
   'equb',
   'edir',
@@ -24,6 +31,7 @@ function validateCreateCommunityInput(input) {
     description,
     communityType,
     logoUrl,
+    bannerUrl,
   } = input;
 
   if (!name || typeof name !== 'string' || !name.trim()) {
@@ -76,16 +84,41 @@ function validateCreateCommunityInput(input) {
     }
   }
 
+  if (bannerUrl !== undefined && bannerUrl !== null) {
+    if (typeof bannerUrl !== 'string') {
+      throw createValidationError(
+        'Community banner URL must be a string',
+        'INVALID_COMMUNITY_BANNER_URL',
+      );
+    }
+  }
+
   return {
     name: name.trim(),
     description: description?.trim() || null,
     communityType,
     logoUrl: logoUrl?.trim() || null,
+    bannerUrl: bannerUrl?.trim() || null,
   };
 }
 
 function validateUpdateCommunityInput(input) {
-  const { name, description, communityType, logoUrl } = input;
+  const {
+    name,
+    description,
+    communityType,
+    logoUrl,
+    bannerUrl,
+  } = input;
+
+  if (bannerUrl !== undefined && bannerUrl !== null) {
+    if (typeof bannerUrl !== 'string') {
+      throw createValidationError(
+        'Community banner URL must be a string',
+        'INVALID_COMMUNITY_BANNER_URL',
+      );
+    }
+  }
 
   if (name !== undefined) {
     if (typeof name !== 'string' || !name.trim()) {
@@ -137,7 +170,8 @@ function validateUpdateCommunityInput(input) {
     name === undefined &&
     description === undefined &&
     communityType === undefined &&
-    logoUrl === undefined
+    logoUrl === undefined &&
+    bannerUrl === undefined
   ) {
     throw createValidationError(
       'At least one community field must be provided',
@@ -152,13 +186,38 @@ function validateUpdateCommunityInput(input) {
       : {}),
     ...(communityType !== undefined ? { communityType } : {}),
     ...(logoUrl !== undefined ? { logoUrl: logoUrl?.trim() || null } : {}),
+    ...(bannerUrl !== undefined
+      ? { bannerUrl: bannerUrl.trim() || null }
+      : {}),
+  };
+}
+
+const COMMUNITY_SORTS = Object.freeze(['newest', 'popular', 'name']);
+const DEFAULT_MY_COMMUNITY_STATUSES = Object.freeze(['pending', 'active', 'suspended']);
+
+function validateListCommunitiesQuery(query = {}) {
+  return {
+    ...parsePagination(query),
+    search: parseSearchFilter(query.q, 'q'),
+    communityType: parseEnumFilter(query.type, COMMUNITY_TYPES, 'type'),
+    sort: parseEnumFilter(query.sort, COMMUNITY_SORTS, 'sort') || 'newest',
+  };
+}
+
+function validateListMyCommunitiesQuery(query = {}) {
+  const status = parseEnumFilter(query.status, MEMBERSHIP_STATUSES, 'status');
+
+  return {
+    ...parsePagination(query),
+    statuses: status ? [status] : [...DEFAULT_MY_COMMUNITY_STATUSES],
   };
 }
 
 module.exports = {
   COMMUNITY_TYPES,
+  COMMUNITY_SORTS,
   validateCreateCommunityInput,
   validateUpdateCommunityInput,
+  validateListCommunitiesQuery,
+  validateListMyCommunitiesQuery,
 };
-
-

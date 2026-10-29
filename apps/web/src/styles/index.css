@@ -1,0 +1,103 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+
+/* Yegna design tokens. Components use these utilities; no hard-coded colors. */
+@theme {
+  --font-sans: 'Inter Variable', 'Noto Sans Ethiopic', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --color-primary: #007c6e;
+  --color-primary-dark: #005b50;
+  --color-secondary: #0a9669;
+  --color-accent: #10b981;
+  --color-primary-soft: #e6f4f1;
+
+  --color-background: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-soft: #f1f7f5;
+
+  --color-ink: #0f172a;
+  --color-ink-secondary: #64748b;
+  --color-ink-muted: #94a3b8;
+  --color-line: #e2e8f0;
+
+  --color-success: #10b981;
+  --color-success-soft: #e7f8f1;
+  --color-success-ink: #047857;
+  --color-warning: #f59e0b;
+  --color-warning-soft: #fef3c7;
+  --color-warning-ink: #92400e;
+  --color-danger: #ef4444;
+  --color-danger-soft: #fee2e2;
+  --color-danger-ink: #b91c1c;
+  --color-info: #3b82f6;
+  --color-info-soft: #dbeafe;
+  --color-info-ink: #1d4ed8;
+
+  --color-sidebar: #00202a;
+  --color-brand-forest: #043424;
+
+  --radius-card: 1rem;
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.06);
+  --shadow-pop: 0 10px 30px -10px rgb(15 23 42 / 0.25);
+
+  --text-h1: 2rem;
+  --text-h1--line-height: 2.5rem;
+  --text-h2: 1.5rem;
+  --text-h2--line-height: 2rem;
+  --text-h3: 1.25rem;
+  --text-h3--line-height: 1.75rem;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.25rem;
+  --text-small: 0.75rem;
+  --text-small--line-height: 1rem;
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.125rem;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-background);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  /* Respect the user's reduced-motion preference everywhere. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@keyframes yegna-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility animate-enter {
+  animation: yegna-fade-in 160ms ease-out both;
+}

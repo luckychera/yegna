@@ -21,6 +21,11 @@ const AUDIT_ACTIONS = Object.freeze({
   CONTRIBUTION_OVERDUE: 'contribution.overdue',
   CONTRIBUTION_PAID: 'contribution.paid',
   CONTRIBUTION_PARTIALLY_PAID: 'contribution.partially_paid',
+
+  PAYMENT_CREATED: 'payment.created',
+  PAYMENT_STATUS_UPDATED: 'payment.status_updated',
+  PAYMENT_SUCCESSFUL: 'payment.successful',
+  PAYMENT_REFUNDED: 'payment.refunded',
 });
 
 const AUDIT_ENTITY_TYPES = Object.freeze({

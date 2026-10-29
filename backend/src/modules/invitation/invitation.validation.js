@@ -1,3 +1,7 @@
+const { parsePagination } = require('../../utils/pagination');
+const { parseEnumFilter } = require('../../utils/query-filters');
+const { INVITATION_STATUS } = require('./invitation.constants');
+
 function createValidationError(message, code = 'VALIDATION_ERROR') {
   const error = new Error(message);
   error.statusCode = 400;
@@ -34,7 +38,16 @@ function validateInvitationId(invitationId) {
   }
 }
 
+function validateListMyInvitationsQuery(query = {}) {
+  return {
+    ...parsePagination(query),
+    status: parseEnumFilter(query.status, Object.values(INVITATION_STATUS), 'status'),
+  };
+}
+
 module.exports = {
+  validateListMyInvitationsQuery,
+
   validateCreateInvitation,
   validateInvitationId,
 };

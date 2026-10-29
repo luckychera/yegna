@@ -4,12 +4,15 @@ const {
   createMembership,
   updateMembership,
   changeMembershipStatus,
+  joinCommunity,
+  leaveCommunity,
 } = require('./membership.service');
 
 const {
   validateCreateMembershipInput,
   validateUpdateMembershipInput,
   validateMembershipId,
+  validateCommunityId,
 } = require('./membership.validation');
 
 async function list(req, res, next) {
@@ -170,7 +173,68 @@ async function remove(req, res, next) {
   }
 }
 
+function toSelfMembership(row) {
+  return {
+    id: row.id,
+    communityId: row.community_id,
+    status: row.status,
+    membershipNumber: row.membership_number,
+    joinedAt: row.joined_at,
+    approvedAt: row.approved_at,
+    leftAt: row.left_at,
+    createdAt: row.created_at,
+  };
+}
+
+async function join(req, res, next) {
+  try {
+    const communityId = validateCommunityId(req.params.communityId);
+
+    const membership = await joinCommunity({
+      communityId,
+      userId: req.user.id,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message:
+        membership.status === 'active'
+          ? 'You have joined the community'
+          : 'Your request to join has been submitted',
+      data: {
+        membership: toSelfMembership(membership),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function leave(req, res, next) {
+  try {
+    const communityId = validateCommunityId(req.params.communityId);
+
+    const membership = await leaveCommunity({
+      communityId,
+      userId: req.user.id,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'You have left the community',
+      data: {
+        membership: toSelfMembership(membership),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
+  join,
+  leave,
+
   list,
   getById,
   create,

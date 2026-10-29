@@ -4,7 +4,10 @@ const {
   createContribution,
   updateContribution,
   changeContributionStatus,
+  listMyContributions,
 } = require('./contribution.service');
+const { validateListMyContributionsQuery } = require('./contribution.validation');
+const { buildPagination } = require('../../utils/pagination');
 
 const {
   validateCreateContributionInput,
@@ -138,7 +141,36 @@ async function cancel(req, res, next) {
   }
 }
 
+async function listMine(req, res, next) {
+  try {
+    const query = validateListMyContributionsQuery(req.query);
+
+    const { contributions, summary, total } = await listMyContributions({
+      userId: req.user.id,
+      ...query,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        contributions,
+        summary,
+      },
+      pagination: buildPagination({
+        limit: query.limit,
+        offset: query.offset,
+        count: contributions.length,
+        total,
+      }),
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
+  listMine,
+
   list,
   getById,
   create,

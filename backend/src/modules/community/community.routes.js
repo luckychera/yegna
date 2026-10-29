@@ -12,6 +12,8 @@ const {
   create,
   getById,
   update,
+  list,
+  listMine,
 } = require('./community.controller');
 
 const router = express.Router();
@@ -20,6 +22,19 @@ router.post(
   '/',
   authenticate,
   create,
+);
+
+router.get(
+  '/',
+  authenticate,
+  list,
+);
+
+// Must stay above '/:communityId' so "me" is never parsed as a community ID.
+router.get(
+  '/me',
+  authenticate,
+  listMine,
 );
 
 router.get(
