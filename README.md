@@ -1,6 +1,10 @@
-| 👤 Full Name | 🆔 CTC Number | 🏫 Classroom |
-| ------------ | ------------- | -----------: |
-| Chera Tolosa | CTC-716-26    |            2 |
+
+| 👤 Full Name | 🆔 CTC Number |    Role       |
+| ------------ | ------------- | -----------:  |
+| Chera Tolosa | CTC-716-26    | Full-Stack dev|
+
+Document : <a href="https://drive.google.com/file/d/10KKFF5YKOBdmiKsxrV7HzURzbK0hJnG1/view?usp=drive_link">Presentation Document </a>
+Video : <a href="https://drive.google.com/file/d/1HgG8w7X0LUEykCFV0K0S6yS6goIiPG9w/view?usp=drive_link">Demo video</a>
 
 <div align="center">
   <img src="./yegna_logo.png" alt="Renite Logo" width="280" style="border-radius: 8px;" />
@@ -14,7 +18,7 @@
 
 ---
 
-**YEGNA** Community is a full-stack platform designed to **digitize and modernize how communities and local organizations in Ethiopia organize, communicate, manage members, handle contributions, and coordinate community activities**.
+**YEGNA** Digital Community is a full-stack platform designed to **digitize and modernize how communities and local organizations in Ethiopia organize, communicate, manage members, handle contributions, and coordinate community activities**.
 
 The platform is inspired by traditional Ethiopian community structures such as **Equb, Edir, and Mahiber**, while being designed as a **general-purpose community operating platform** that can support many different types of organizations and groups.
 
@@ -289,7 +293,7 @@ Digital Community will maintain its own application-level user information such 
 
 ---
 
-# 🪪 Digital Membership Card
+# 🪪 Digital Membership Card ** Future **
 
 Each community member can receive a digital membership card.
 
@@ -388,7 +392,7 @@ Financial Ledger
 
 ---
 
-# 👛 Secure Wallet
+# 👛 Secure Wallet **Future**
 
 A secure wallet system is planned as an advanced feature.
 
@@ -409,7 +413,7 @@ Advanced wallet functionality can be introduced later after the underlying finan
 
 ---
 
-# 🔄 Recurring Payments & Subscriptions
+# 🔄 Recurring Payments & Subscriptions **Future**
 
 Digital Community will support recurring payment concepts.
 
@@ -447,7 +451,7 @@ Subscription functionality will be implemented gradually.
 
 ---
 
-# 🤖 AI Integration
+# 🤖 AI Integration **Future**
 
 AI will be integrated as a practical assistant rather than as a decorative feature.
 
@@ -612,7 +616,7 @@ Audit logs should help answer:
 
 ---
 
-# 🏛️ Digital Governance
+# 🏛️ Digital Governance **Future**
 
 Future versions may support digital community governance.
 
@@ -831,7 +835,7 @@ Docker
  └── Supporting Services
 ```
 
-If managed infrastructure such as Supabase is used, its managed services do not necessarily need to be containerized locally.
+
 
 Docker will help provide:
 
