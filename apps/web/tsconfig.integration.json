@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.integration.tsbuildinfo",
+    "types": ["node", "vite/client"]
+  },
+  "include": ["src/test/integration", "src/env.d.ts", "src/lib", "src/features"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
+}
