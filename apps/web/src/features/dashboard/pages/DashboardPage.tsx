@@ -44,45 +44,65 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <header>
+      <header className="animate-dashboard-rise">
         <h1 className="text-h2 font-semibold text-ink sm:text-h1 sm:font-bold">
           {greetingFor()}
           {firstName ? `, ${firstName}` : ''}
         </h1>
-        <p className="mt-1 text-body text-ink-secondary">Here&apos;s what&apos;s happening in your communities.</p>
+        <p className="mt-1 text-body text-ink-secondary">
+          Here&apos;s what&apos;s happening in your communities.
+        </p>
       </header>
 
-      <section aria-label="Summary" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="My Communities"
-          icon={Users}
-          value={String(communities.data?.pagination.total ?? 0)}
-          loading={communities.isPending}
-        />
-        <StatCard
-          label="Total Contributions"
-          icon={HandCoins}
-          tone="info"
-          value={formatMoney(paid?.totalPaid ?? 0, currency)}
-          hint="Paid so far"
-          loading={payments.isPending}
-        />
-        <StatCard
-          label="Amount Due"
-          icon={CreditCard}
-          tone="warning"
-          value={formatMoney(due?.outstandingAmount ?? 0, currency)}
-          hint={due && due.overdueCount > 0 ? `${due.overdueCount} overdue` : 'Outstanding contributions'}
-          loading={contributions.isPending}
-        />
-        <StatCard
-          label="Notifications"
-          icon={Bell}
-          tone="danger"
-          value={String(unread.data ?? 0)}
-          hint="Unread"
-          loading={unread.isPending}
-        />
+      <section
+        aria-label="Summary"
+        className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
+      >
+        <div className="animate-dashboard-rise dashboard-delay-1">
+          <StatCard
+            label="My Communities"
+            icon={Users}
+            value={String(communities.data?.pagination.total ?? 0)}
+            loading={communities.isPending}
+          />
+        </div>
+
+        <div className="animate-dashboard-rise dashboard-delay-2">
+          <StatCard
+            label="Total Contributions"
+            icon={HandCoins}
+            tone="info"
+            value={formatMoney(paid?.totalPaid ?? 0, currency)}
+            hint="Paid so far"
+            loading={payments.isPending}
+          />
+        </div>
+
+        <div className="animate-dashboard-rise dashboard-delay-3">
+          <StatCard
+            label="Amount Due"
+            icon={CreditCard}
+            tone="warning"
+            value={formatMoney(due?.outstandingAmount ?? 0, currency)}
+            hint={
+              due && due.overdueCount > 0
+                ? `${due.overdueCount} overdue`
+                : 'Outstanding contributions'
+            }
+            loading={contributions.isPending}
+          />
+        </div>
+
+        <div className="animate-dashboard-rise dashboard-delay-4">
+          <StatCard
+            label="Notifications"
+            icon={Bell}
+            tone="danger"
+            value={String(unread.data ?? 0)}
+            hint="Unread"
+            loading={unread.isPending}
+          />
+        </div>
       </section>
 
       {hasNoCommunities ? (
@@ -97,16 +117,21 @@ export function DashboardPage() {
         />
       ) : (
         <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
+          <Card className="group relative overflow-hidden animate-dashboard-rise dashboard-delay-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-pop motion-reduce:transform-none motion-reduce:transition-none">
             <CardHeader>
               <CardTitle>Recent Activity</CardTitle>
-              <Link to="/notifications" className="text-label font-medium text-primary hover:underline">
+              <Link
+                to="/notifications"
+                className="text-label font-medium text-primary hover:underline"
+              >
                 View all
               </Link>
             </CardHeader>
             <CardContent>
               {activity.isPending ? <ListSkeleton rows={3} /> : null}
-              {activity.isError ? <ErrorState error={activity.error} onRetry={() => void activity.refetch()} /> : null}
+              {activity.isError ? (
+                <ErrorState error={activity.error} onRetry={() => void activity.refetch()} />
+              ) : null}
               {activity.isSuccess && activity.data.items.length === 0 ? (
                 <p className="py-6 text-center text-body text-ink-secondary">No activity yet.</p>
               ) : null}
@@ -116,10 +141,13 @@ export function DashboardPage() {
                     const { icon: Icon, tone } = notificationVisual(item.type);
 
                     return (
-                      <li key={item.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                      <li
+                        key={item.id}
+                        className="group -mx-2 flex items-start gap-3 rounded-xl px-2 py-3 transition-colors duration-200 hover:bg-surface-soft first:pt-3 last:pb-3 motion-reduce:transition-none "
+                      >
                         <span
                           className={cn(
-                            'flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+                            'flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-transform duration-200 group-hover:scale-105 motion-reduce:transform-none motion-reduce:transition-none',
                             tone === 'success' && 'bg-success-soft text-success-ink',
                             tone === 'warning' && 'bg-warning-soft text-warning-ink',
                             tone === 'danger' && 'bg-danger-soft text-danger-ink',
@@ -130,10 +158,15 @@ export function DashboardPage() {
                           <Icon className="h-4 w-4" aria-hidden />
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className={cn('text-body text-ink', !item.readAt && 'font-semibold')}>{item.title}</p>
+                          <p className={cn('text-body text-ink', !item.readAt && 'font-semibold')}>
+                            {item.title}
+                          </p>
                           <p className="truncate text-small text-ink-secondary">{item.message}</p>
                         </div>
-                        <time className="shrink-0 text-small text-ink-muted" dateTime={item.createdAt}>
+                        <time
+                          className="shrink-0 text-small text-ink-muted"
+                          dateTime={item.createdAt}
+                        >
                           {formatRelative(item.createdAt)}
                         </time>
                       </li>
@@ -144,29 +177,49 @@ export function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="group relative overflow-hidden animate-dashboard-rise dashboard-delay-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-pop motion-reduce:transform-none motion-reduce:transition-none">
             <CardHeader>
               <CardTitle>Upcoming Contributions</CardTitle>
-              <Link to="/contributions" className="text-label font-medium text-primary hover:underline">
+              <Link
+                to="/contributions"
+                className="text-label font-medium text-primary hover:underline"
+              >
                 View all
               </Link>
             </CardHeader>
             <CardContent>
               {contributions.isPending ? <ListSkeleton rows={3} /> : null}
               {contributions.isError ? (
-                <ErrorState error={contributions.error} onRetry={() => void contributions.refetch()} />
+                <ErrorState
+                  error={contributions.error}
+                  onRetry={() => void contributions.refetch()}
+                />
               ) : null}
               {contributions.isSuccess && upcoming.length === 0 ? (
-                <p className="py-6 text-center text-body text-ink-secondary">You&apos;re all caught up. Nothing is due.</p>
+                <p className="py-6 text-center text-body text-ink-secondary">
+                  You&apos;re all caught up. Nothing is due.
+                </p>
               ) : null}
               {upcoming.length > 0 ? (
                 <ul className="divide-y divide-line">
                   {upcoming.map((item) => (
-                    <li key={item.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                      <Avatar name={item.community.name} src={item.community.logoUrl} shape="rounded" />
+                    <li
+                      key={item.id}
+                      className="group -mx-2 flex items-center gap-3 rounded-xl px-2 py-3 transition-colors duration-200 hover:bg-surface-soft first:pt-3 last:pb-3 motion-reduce:transition-none"
+                    >
+                      <Avatar
+                        className="transition-transform duration-200 group-hover:scale-105 motion-reduce:transform-none motion-reduce:transition-none"
+                        name={item.community.name}
+                        src={item.community.logoUrl}
+                        shape="rounded"
+                      />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-body font-medium text-ink">{item.community.name}</p>
-                        <p className="text-small text-ink-secondary">{formatDueLabel(item.dueDate)}</p>
+                        <p className="truncate text-body font-medium text-ink">
+                          {item.community.name}
+                        </p>
+                        <p className="text-small text-ink-secondary">
+                          {formatDueLabel(item.dueDate)}
+                        </p>
                       </div>
                       <div className="flex flex-col items-end gap-1">
                         <span className="text-body font-semibold text-ink">

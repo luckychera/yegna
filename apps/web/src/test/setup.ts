@@ -1,17 +1,29 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
-import { afterAll, afterEach, beforeAll } from 'vitest';
+import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 
 import { tokenStore } from '@/lib/auth/token-store';
 import { server } from './server';
 
-// Lazy route chunks (Recharts in particular) can take a moment to load on a cold start.
 configure({ asyncUtilTimeout: 5000 });
 
 beforeAll(() => {
-  server.listen({ onUnhandledRequest: 'error' });
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+matches: query === '(min-width: 768px)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
 
-  // jsdom has no layout engine; Recharts' ResponsiveContainer needs a ResizeObserver to exist.
+  server.listen({ onUnhandledFrame: 'error' });
+
   globalThis.ResizeObserver ??= class {
     observe() {}
     unobserve() {}

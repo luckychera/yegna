@@ -3,7 +3,9 @@
 
 /* Yegna design tokens. Components use these utilities; no hard-coded colors. */
 @theme {
-  --font-sans: 'Inter Variable', 'Noto Sans Ethiopic', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans:
+    'Inter Variable', 'Noto Sans Ethiopic', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    sans-serif;
 
   --color-primary: #007c6e;
   --color-primary-dark: #005b50;
@@ -87,6 +89,61 @@
   }
 }
 
+/* Yegna dark theme */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-primary: #45c9ac;
+  --color-primary-dark: #68dfc2;
+  --color-secondary: #35b88f;
+  --color-accent: #4adea8;
+  --color-primary-soft: #153b36;
+
+  --color-background: #0b1720;
+  --color-surface: #14232d;
+  --color-surface-soft: #1b303a;
+
+  --color-ink: #f1f5f9;
+  --color-ink-secondary: #a3b3c0;
+  --color-ink-muted: #778b99;
+  --color-line: #293d48;
+
+  --color-success: #34d399;
+  --color-success-soft: #123b32;
+  --color-success-ink: #6ee7b7;
+
+  --color-warning: #fbbf24;
+  --color-warning-soft: #44351b;
+  --color-warning-ink: #fcd34d;
+
+  --color-danger: #fb7185;
+  --color-danger-soft: #44232c;
+  --color-danger-ink: #fda4af;
+
+  --color-info: #60a5fa;
+  --color-info-soft: #1c3550;
+  --color-info-ink: #93c5fd;
+
+  --color-sidebar: #07151c;
+  --color-brand-forest: #102b24;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  html[data-theme='dark'] {
+    color-scheme: dark;
+  }
+
+  body {
+    transition:
+      background-color 200ms ease,
+      color 200ms ease;
+  }
+}
+
 @keyframes yegna-fade-in {
   from {
     opacity: 0;
@@ -100,4 +157,43 @@
 
 @utility animate-enter {
   animation: yegna-fade-in 160ms ease-out both;
+}
+
+@keyframes yegna-dashboard-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@utility animate-dashboard-rise {
+  animation: yegna-dashboard-rise 550ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@utility dashboard-delay-1 {
+  animation-delay: 80ms;
+}
+
+@utility dashboard-delay-2 {
+  animation-delay: 160ms;
+}
+
+@utility dashboard-delay-3 {
+  animation-delay: 240ms;
+}
+
+@utility dashboard-delay-4 {
+  animation-delay: 320ms;
+}
+
+@utility dashboard-delay-5 {
+  animation-delay: 400ms;
+}
+
+@utility dashboard-delay-6 {
+  animation-delay: 480ms;
 }
