@@ -26,6 +26,10 @@ const AUDIT_ACTIONS = Object.freeze({
   PAYMENT_STATUS_UPDATED: 'payment.status_updated',
   PAYMENT_SUCCESSFUL: 'payment.successful',
   PAYMENT_REFUNDED: 'payment.refunded',
+
+  ANNOUNCEMENT_PUBLISHED: 'announcement.published',
+  ANNOUNCEMENT_UPDATED: 'announcement.updated',
+  ANNOUNCEMENT_ARCHIVED: 'announcement.archived',
 });
 
 const AUDIT_ENTITY_TYPES = Object.freeze({
@@ -37,6 +41,7 @@ const AUDIT_ENTITY_TYPES = Object.freeze({
   CONTRIBUTION: 'contribution',
   PAYMENT: 'payment',
   LEDGER_TRANSACTION: 'ledger_transaction',
+  ANNOUNCEMENT: 'announcement',
 });
 
 module.exports = {

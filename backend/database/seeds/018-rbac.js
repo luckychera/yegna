@@ -128,6 +128,8 @@ async function seed() {
           'reports.export',
 
           'audit.view',
+
+          'announcements.manage',
         ]),
       ],
     );

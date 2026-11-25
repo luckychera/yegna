@@ -14,6 +14,8 @@ const paymentMeRoutes = require('../modules/payment/payment.me.routes');
 const usersRoutes = require('../modules/users/users.routes');
 const reportingRoutes = require('../modules/reporting/reporting.routes');
 const notificationRoutes = require('../modules/notification/notification.routes');
+const announcementRoutes = require('../modules/announcement/announcement.routes');
+const membershipCardRoutes = require('../modules/membership-card/membership-card.routes');
 
 const router = express.Router();
 
@@ -27,6 +29,9 @@ router.use('/communities', membershipRoutes);
 router.use('/', invitationRoutes);
 router.use('/communities', contributionRoutes);
 router.use('/communities', paymentRoutes);
+router.use('/communities', announcementRoutes.communityRouter);
+router.use('/announcements', announcementRoutes.meRouter);
+router.use('/membership-cards', membershipCardRoutes);
 router.use('/contributions', contributionMeRoutes);
 router.use('/payments', paymentMeRoutes);
 router.use('/users', usersRoutes);

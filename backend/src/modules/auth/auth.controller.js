@@ -4,6 +4,9 @@ const {
   rotateRefreshToken,
   revokeAuthSession,
   revokeAllUserSessions,
+  listActiveSessions,
+  revokeSessionById,
+  revokeOtherSessions,
 } = require('./session.service');
 
 const {
@@ -132,10 +135,71 @@ async function changePasswordHandler(req, res, next) {
   }
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+async function listSessions(req, res, next) {
+  try {
+    const sessions = await listActiveSessions(req.user.id, req.user.sessionId);
+
+    return res.status(200).json({
+      success: true,
+      data: { sessions },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function revokeSession(req, res, next) {
+  try {
+    const { sessionId } = req.params;
+
+    if (!UUID_PATTERN.test(sessionId)) {
+      const error = new Error('Session ID must be a valid UUID');
+      error.statusCode = 400;
+      error.code = 'INVALID_SESSION_ID';
+      throw error;
+    }
+
+    if (sessionId === req.user.sessionId) {
+      const error = new Error('Use sign out to end the current session');
+      error.statusCode = 400;
+      error.code = 'CANNOT_REVOKE_CURRENT_SESSION';
+      throw error;
+    }
+
+    await revokeSessionById(req.user.id, sessionId);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Session signed out',
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function revokeOthers(req, res, next) {
+  try {
+    const result = await revokeOtherSessions(req.user.id, req.user.sessionId);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Signed out of all other sessions',
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   register,
   login,
   refresh,
   logout,
   changePasswordHandler,
+  listSessions,
+  revokeSession,
+  revokeOthers,
 };

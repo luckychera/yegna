@@ -131,6 +131,7 @@ async function createCommunity({
           'reports.view',
           'reports.export',
           'audit.view',
+          'announcements.manage',
         ]),
       ],
     );

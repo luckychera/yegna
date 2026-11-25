@@ -205,7 +205,7 @@ async function rotateRefreshToken({ refreshToken, ipAddress, userAgent }) {
             phone: session.phone,
             status: session.status,
           },
-          accessToken: generateAccessToken({ id: session.user_id }),
+          accessToken: generateAccessToken({ id: session.user_id }, newSession.id),
           refreshToken: newRefreshToken,
           refreshTokenExpiresAt: newSession.expires_at,
         },
@@ -268,9 +268,83 @@ async function revokeAllUserSessions(userId) {
   };
 }
 
+// A signed-in device is the newest, unrevoked row of its refresh-token chain.
+// created_at is therefore the last time that device refreshed its session.
+async function listActiveSessions(userId, currentSessionId = null) {
+  const result = await pool.query(
+    `
+      SELECT id, ip_address, user_agent, created_at, expires_at
+      FROM auth_sessions
+      WHERE user_id = $1
+        AND revoked_at IS NULL
+        AND expires_at > NOW()
+      ORDER BY created_at DESC
+      LIMIT 50;
+    `,
+    [userId],
+  );
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    ipAddress: row.ip_address,
+    userAgent: row.user_agent,
+    lastActiveAt: row.created_at,
+    expiresAt: row.expires_at,
+    current: row.id === currentSessionId,
+  }));
+}
+
+async function revokeSessionById(userId, sessionId) {
+  const result = await pool.query(
+    `
+      UPDATE auth_sessions
+      SET revoked_at = NOW(),
+          updated_at = NOW()
+      WHERE id = $1
+        AND user_id = $2
+        AND revoked_at IS NULL
+      RETURNING id;
+    `,
+    [sessionId, userId],
+  );
+
+  if (result.rowCount === 0) {
+    throw createSessionError('Session not found', 404, 'SESSION_NOT_FOUND');
+  }
+
+  return { revoked: true };
+}
+
+async function revokeOtherSessions(userId, currentSessionId) {
+  if (!currentSessionId) {
+    throw createSessionError(
+      'The current session could not be identified. Please sign in again.',
+      400,
+      'CURRENT_SESSION_UNKNOWN',
+    );
+  }
+
+  const result = await pool.query(
+    `
+      UPDATE auth_sessions
+      SET revoked_at = NOW(),
+          updated_at = NOW()
+      WHERE user_id = $1
+        AND id <> $2
+        AND revoked_at IS NULL
+    `,
+    [userId, currentSessionId],
+  );
+
+  return { revokedCount: result.rowCount };
+}
+
 module.exports = {
   createAuthSession,
   rotateRefreshToken,
   revokeAuthSession,
   revokeAllUserSessions,
+  listActiveSessions,
+  revokeSessionById,
+  revokeOtherSessions,
 };

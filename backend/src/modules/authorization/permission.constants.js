@@ -26,6 +26,8 @@ const PERMISSIONS = Object.freeze({
   REPORTS_EXPORT: 'reports.export',
 
   AUDIT_VIEW: 'audit.view',
+
+  ANNOUNCEMENTS_MANAGE: 'announcements.manage',
 });
 
 module.exports = {

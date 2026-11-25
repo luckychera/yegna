@@ -1,4 +1,5 @@
 const notificationService = require('./notification.service');
+const notificationPreferences = require('./notification.preferences');
 
 function parseBoolean(value, fieldName) {
   if (value === undefined) return false;
@@ -125,10 +126,42 @@ async function markAllRead(req, res, next) {
   }
 }
 
+async function getPreferences(req, res, next) {
+  try {
+    const preferences = await notificationPreferences.getNotificationPreferences(req.user.id);
+
+    return res.status(200).json({
+      success: true,
+      data: { preferences },
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function updatePreferences(req, res, next) {
+  try {
+    const preferences = await notificationPreferences.updateNotificationPreferences(
+      req.user.id,
+      req.body,
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Notification preferences saved',
+      data: { preferences },
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   list,
   unreadCount,
   getById,
   markRead,
   markAllRead,
+  getPreferences,
+  updatePreferences,
 };

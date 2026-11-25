@@ -52,7 +52,9 @@ const env = {
   databaseUrl: process.env.DATABASE_URL,
 
   jwtSecret: process.env.JWT_SECRET,
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '330m',
+  // Access tokens are stateless, so they stay valid until they expire even after
+  // sign-out or a password change. Keep them short; the web app refreshes them.
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '15m',
 
   corsOrigins,
   appBaseUrl,

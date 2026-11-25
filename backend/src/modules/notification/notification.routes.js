@@ -7,6 +7,8 @@ const {
   getById,
   markRead,
   markAllRead,
+  getPreferences,
+  updatePreferences,
 } = require('./notification.controller');
 
 const router = express.Router();
@@ -16,6 +18,9 @@ router.use(authenticate);
 router.get('/', list);
 router.get('/unread-count', unreadCount);
 router.patch('/read-all', markAllRead);
+// Must stay above '/:notificationId' so "preferences" is never parsed as an ID.
+router.get('/preferences', getPreferences);
+router.patch('/preferences', updatePreferences);
 router.get('/:notificationId', getById);
 router.patch('/:notificationId/read', markRead);
 

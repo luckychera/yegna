@@ -30,6 +30,7 @@ function authenticate(req, res, next) {
 
     req.user = {
       id: payload.sub,
+      sessionId: typeof payload.sid === 'string' ? payload.sid : null,
     };
 
     next();

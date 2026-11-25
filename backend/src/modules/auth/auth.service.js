@@ -148,7 +148,7 @@ async function registerUser({
       userAgent,
     });
 
-    const accessToken = generateAccessToken(user);
+    const accessToken = generateAccessToken(user, session.sessionId);
 
     return {
       user: {
@@ -250,7 +250,7 @@ async function loginUser({ email, phone, password, ipAddress, userAgent }) {
     userAgent,
   });
 
-  const accessToken = generateAccessToken(user);
+  const accessToken = generateAccessToken(user, session.sessionId);
 
   return {
     user: {
