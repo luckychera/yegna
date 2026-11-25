@@ -52,8 +52,9 @@ describe('ReportsPage', () => {
 
     renderApp('/reports');
 
+    // The route guard refuses access before the page renders.
     await waitFor(() => {
-      expect(screen.getByText('No reports available')).toBeInTheDocument();
+      expect(screen.getByText('Permission denied')).toBeInTheDocument();
     });
 
     expect(

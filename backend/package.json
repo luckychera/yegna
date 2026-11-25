@@ -7,6 +7,7 @@
     "test": "tests"
   },
   "scripts": {
+    "pretest": "node tests/helpers/seed-shared-fixture.js",
     "test": "node --test",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
