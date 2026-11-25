@@ -42,15 +42,21 @@ class ChapaClient {
     }
 
     if (!response.ok) {
-     const message = body?.message;
+      const message = body?.message;
 
-const error = new Error(
-  typeof message === 'string'
-    ? message
-    : JSON.stringify(message || 'Chapa payment request failed'),
-);
+      const error = new Error(
+        typeof message === 'string'
+          ? message
+          : JSON.stringify(message || 'Chapa payment request failed'),
+      );
 
-      error.statusCode = response.status >= 500 ? 502 : response.status;
+      // Provider auth errors must never reach the browser as 401/403: the web
+      // client would treat them as the member's own session expiring.
+      error.statusCode =
+        response.status >= 500 || response.status === 401 || response.status === 403
+          ? 502
+          : response.status;
+      error.providerStatus = response.status;
       error.code = 'CHAPA_API_ERROR';
       error.providerResponse = body;
 
