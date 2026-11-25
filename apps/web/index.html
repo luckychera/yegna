@@ -14,6 +14,32 @@
 <body>
   <div id="root"></div>
   <script type="module" src="./src/main.tsx"></script>
+  <script>
+  (() => {
+    try {
+      const saved = localStorage.getItem('yegna-theme');
+      const preference =
+        saved === 'light' || saved === 'dark' || saved === 'system'
+          ? saved
+          : 'system';
+
+      const systemDark = window.matchMedia(
+        '(prefers-color-scheme: dark)'
+      ).matches;
+
+      const theme =
+        preference === 'system'
+          ? systemDark ? 'dark' : 'light'
+          : preference;
+
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.dataset.themePreference = preference;
+    } catch {
+      document.documentElement.dataset.theme = 'light';
+    }
+  })();
+</script>
+
 </body>
 
 </html>

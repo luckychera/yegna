@@ -30,7 +30,9 @@ export function profileFixture(overrides: Partial<UserProfile> = {}): UserProfil
   };
 }
 
-export function communityFixture(overrides: Partial<CommunityListItem> = {}): CommunityListItem {
+export function communityFixture(
+  overrides: Partial<CommunityListItem> = {},
+): CommunityListItem {
   return {
     id: 'community-1',
     name: 'Bole Community',
@@ -38,13 +40,13 @@ export function communityFixture(overrides: Partial<CommunityListItem> = {}): Co
     communityType: 'equb',
     status: 'active',
     logoUrl: null,
+    bannerUrl: null, // Add this
     memberCount: 48,
     createdAt: '2026-01-01T00:00:00.000Z',
     myMembership: null,
     ...overrides,
   };
 }
-
 export function myCommunityFixture(permissions: string[] = [], overrides: Partial<MyCommunity> = {}): MyCommunity {
   const { myMembership: _ignored, ...community } = communityFixture();
 
