@@ -19,4 +19,5 @@ export interface CommunityInvitation {
   invitedUserId: string;
   expiresAt: string;
   createdAt: string;
+  roleName: string | null;
 }

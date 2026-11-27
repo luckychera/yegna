@@ -9,11 +9,13 @@ export const PERMISSIONS = {
   MEMBERS_INVITE: 'members.invite',
   MEMBERS_UPDATE: 'members.update',
   MEMBERS_REMOVE: 'members.remove',
+  ROLES_ASSIGN: 'roles.assign',
   CONTRIBUTIONS_VIEW: 'contributions.view',
   CONTRIBUTIONS_CREATE: 'contributions.create',
   CONTRIBUTIONS_UPDATE: 'contributions.update',
   PAYMENTS_VIEW: 'payments.view',
   REPORTS_VIEW: 'reports.view',
+  ANNOUNCEMENTS_MANAGE: 'announcements.manage',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[(keyof typeof PERMISSIONS)];

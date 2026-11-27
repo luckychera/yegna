@@ -46,7 +46,7 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
             <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
             <span className="flex-1">{label}</span>
             {badgeCount > 0 ? (
-              <span className="min-w-5 rounded-full bg-danger px-1.5 py-0.5 text-center text-small font-semibold text-white">
+              <span className="min-w-5 rounded-full bg-danger px-1.5 py-0.5 text-center text-small font-semibold text-on-danger">
                 <span aria-hidden>{badgeCount > 99 ? '99+' : badgeCount}</span>
                 <span className="sr-only">{badgeCount} new</span>
               </span>

@@ -11,6 +11,13 @@ export interface Member {
   name: string;
   email: string | null;
   phone: string | null;
+  roles: { id: string; name: string }[];
+}
+
+export interface AssignableRole {
+  id: string;
+  name: string;
+  description: string;
 }
 
 export type MemberAction = 'approve' | 'reject' | 'suspend' | 'remove';

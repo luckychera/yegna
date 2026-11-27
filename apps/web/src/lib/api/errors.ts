@@ -51,6 +51,7 @@ const CODE_MESSAGES: Record<string, string> = {
     'Your payment was received by the payment provider but could not be applied to this contribution automatically. Please contact your community administrator and quote your payment reference.',
   CONTRIBUTION_ALREADY_SETTLED: 'This contribution has already been paid in full.',
   CONTRIBUTION_NOT_PAYABLE: 'This contribution can no longer receive payments.',
+  CARD_NOT_FOUND: 'This card could not be verified. The code may be wrong, or it was replaced with a new one.',
 };
 
 export function getErrorMessage(error: unknown, fallback = 'Something went wrong. Please try again.'): string {

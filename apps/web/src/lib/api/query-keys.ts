@@ -4,6 +4,7 @@ export const queryKeys = {
   myCommunities: (params?: object) => ['communities', 'mine', params ?? {}] as const,
   communities: (params?: object) => ['communities', 'list', params ?? {}] as const,
   members: (communityId: string) => ['communities', communityId, 'members'] as const,
+  assignableRoles: (communityId: string) => ['communities', communityId, 'roles', 'assignable'] as const,
   communityContributions: (communityId: string) => ['communities', communityId, 'contributions'] as const,
   communityPayments: (communityId: string) => ['communities', communityId, 'payments'] as const,
   communityInvitations: (communityId: string) => ['communities', communityId, 'invitations'] as const,
@@ -14,4 +15,11 @@ export const queryKeys = {
   unreadCount: ['notifications', 'unread-count'] as const,
   report: (type: string, communityId: string, params?: object) =>
     ['reports', type, communityId, params ?? {}] as const,
+  identity: ['account', 'identity'] as const,
+  sessions: ['account', 'sessions'] as const,
+  membershipCards: ['account', 'membership-cards'] as const,
+  cardVerification: (code: string) => ['membership-card-verification', code] as const,
+  notificationPreferences: ['notifications', 'preferences'] as const,
+  communityAnnouncements: (communityId: string) => ['announcements', 'community', communityId] as const,
+  myAnnouncements: (limit: number) => ['announcements', 'mine', limit] as const,
 };

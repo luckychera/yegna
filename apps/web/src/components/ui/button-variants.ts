@@ -5,9 +5,9 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: 'bg-primary text-white hover:bg-primary-dark active:bg-primary-dark',
+        primary: 'bg-primary text-on-primary hover:bg-primary-dark active:bg-primary-dark',
         secondary: 'border border-line bg-surface text-ink hover:bg-surface-soft active:bg-line',
-        danger: 'bg-danger text-white hover:bg-danger-ink active:bg-danger-ink',
+        danger: 'bg-danger text-on-danger hover:bg-danger-ink active:bg-danger-ink',
         ghost: 'text-ink-secondary hover:bg-surface-soft hover:text-ink active:bg-line',
         outline: 'border border-primary bg-transparent text-primary hover:bg-primary-soft',
       },

@@ -1,4 +1,5 @@
 const { pool } = require('../../config/database');
+const { ensureSystemRoles } = require('../role/role.service');
 const { escapeLikePattern } = require('../../utils/query-filters');
 const { getUserAuthorization } = require('../authorization/authorization.service');
 
@@ -84,56 +85,22 @@ async function createCommunity({
 
     const membership = membershipResult.rows[0];
 
+    await ensureSystemRoles(client, community.id);
+
     const roleResult = await client.query(
       `
-        INSERT INTO community_roles (
-          community_id,
-          name,
-          description,
-          permissions,
-          is_system_role
-        )
-        VALUES (
-          $1,
-          'admin',
-          'Community administrator',
-          $2::JSONB,
-          TRUE
-        )
-        RETURNING
+        SELECT
           id,
           community_id,
           name,
           description,
           permissions,
-          is_system_role;
+          is_system_role
+        FROM community_roles
+        WHERE community_id = $1
+          AND name = 'admin';
       `,
-      [
-        community.id,
-        JSON.stringify([
-          'community.view',
-          'community.update',
-          'members.view',
-          'members.invite',
-          'members.update',
-          'members.remove',
-          'roles.view',
-          'roles.assign',
-          'roles.revoke',
-          'contributions.view',
-          'contributions.create',
-          'contributions.update',
-          'finance.view',
-          'finance.manage',
-          'payments.view',
-          'payments.create',
-          'payments.refund',
-          'reports.view',
-          'reports.export',
-          'audit.view',
-          'announcements.manage',
-        ]),
-      ],
+      [community.id],
     );
 
     const role = roleResult.rows[0];

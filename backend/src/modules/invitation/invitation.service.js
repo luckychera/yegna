@@ -5,6 +5,7 @@ const { INVITATION_STATUS, INVITATION_DEFAULT_EXPIRY_DAYS } = require('./invitat
 const { createAuditLog } = require('../audit/audit.service');
 const { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } = require('../audit/audit.constants');
 const { createMembership } = require('../membership/membership.service');
+const { resolveInvitationRole, resolveAcceptanceRole } = require('../role/role.service');
 const { notifySafely } = require('../notification/notification.events');
 
 const INVITATION_TOKEN_BYTES = 32;
@@ -30,7 +31,7 @@ function getInvitationExpiry() {
   return expiresAt;
 }
 
-async function createInvitation({ communityId, inviterUserId, invitedUserId, metadata = {} }) {
+async function createInvitation({ communityId, inviterUserId, invitedUserId, email, roleId = null, metadata = {} }) {
   const client = await pool.connect();
 
   try {
@@ -50,6 +51,22 @@ async function createInvitation({ communityId, inviterUserId, invitedUserId, met
       throw createServiceError('Community not found', 404, 'COMMUNITY_NOT_FOUND');
     }
 
+    let resolvedUserId = invitedUserId;
+
+    if (!resolvedUserId && email) {
+      const byEmail = await client.query(
+        `
+          SELECT id
+          FROM users
+          WHERE lower(email) = lower($1)
+            AND deleted_at IS NULL
+        `,
+        [email.trim()],
+      );
+
+      resolvedUserId = byEmail.rows[0]?.id || null;
+    }
+
     const userResult = await client.query(
       `
         SELECT id
@@ -57,14 +74,14 @@ async function createInvitation({ communityId, inviterUserId, invitedUserId, met
         WHERE id = $1
           AND deleted_at IS NULL
       `,
-      [invitedUserId],
+      [resolvedUserId],
     );
 
     if (userResult.rowCount === 0) {
       throw createServiceError('Invited user not found', 404, 'USER_NOT_FOUND');
     }
 
-    if (inviterUserId === invitedUserId) {
+    if (inviterUserId === resolvedUserId) {
       throw createServiceError('You cannot invite yourself', 400, 'SELF_INVITATION_NOT_ALLOWED');
     }
 
@@ -75,7 +92,7 @@ async function createInvitation({ communityId, inviterUserId, invitedUserId, met
         WHERE community_id = $1
           AND user_id = $2
       `,
-      [communityId, invitedUserId],
+      [communityId, resolvedUserId],
     );
 
     if (membershipResult.rowCount > 0) {
@@ -103,7 +120,7 @@ async function createInvitation({ communityId, inviterUserId, invitedUserId, met
           AND status = $3
         LIMIT 1
       `,
-      [communityId, invitedUserId, INVITATION_STATUS.PENDING],
+      [communityId, resolvedUserId, INVITATION_STATUS.PENDING],
     );
 
     if (pendingInvitationResult.rowCount > 0) {
@@ -117,6 +134,11 @@ async function createInvitation({ communityId, inviterUserId, invitedUserId, met
     const token = generateInvitationToken();
     const tokenHash = hashInvitationToken(token);
     const expiresAt = getInvitationExpiry();
+    const role = await resolveInvitationRole(client, {
+      communityId,
+      inviterUserId,
+      roleId,
+    });
 
     const invitationResult = await client.query(
       `
@@ -127,9 +149,10 @@ async function createInvitation({ communityId, inviterUserId, invitedUserId, met
           token_hash,
           status,
           expires_at,
-          metadata
+          metadata,
+          role_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING
           id,
           community_id,
@@ -138,17 +161,19 @@ async function createInvitation({ communityId, inviterUserId, invitedUserId, met
           status,
           expires_at,
           metadata,
+          role_id,
           created_at,
           updated_at
       `,
       [
         communityId,
         inviterUserId,
-        invitedUserId,
+        resolvedUserId,
         tokenHash,
         INVITATION_STATUS.PENDING,
         expiresAt,
         JSON.stringify(metadata),
+        role.id,
       ],
     );
 
@@ -161,7 +186,8 @@ async function createInvitation({ communityId, inviterUserId, invitedUserId, met
       entityType: AUDIT_ENTITY_TYPES.INVITATION,
       entityId: invitation.id,
       newValues: {
-        invitedUserId,
+        invitedUserId: resolvedUserId,
+        role: role.name,
         status: invitation.status,
         expiresAt: invitation.expires_at,
       },
@@ -171,7 +197,7 @@ async function createInvitation({ communityId, inviterUserId, invitedUserId, met
     await client.query('COMMIT');
 
     await notifySafely({
-      userId: invitedUserId,
+      userId: resolvedUserId,
       communityId,
       type: 'invitation_received',
       title: 'Community invitation received',
@@ -183,6 +209,7 @@ async function createInvitation({ communityId, inviterUserId, invitedUserId, met
 
     return {
       ...invitation,
+      role: { id: role.id, name: role.name, description: role.description },
       token,
     };
   } catch (error) {
@@ -254,6 +281,8 @@ async function listInvitations(communityId, status) {
         rejected_at,
         revoked_at,
         metadata,
+        role_id,
+        (SELECT name FROM community_roles cr WHERE cr.id = community_invitations.role_id) AS role_name,
         created_at,
         updated_at
       FROM community_invitations
@@ -577,6 +606,12 @@ async function acceptInvitation({ invitationToken, invitationId, invitedUserId }
       }
     }
 
+    const acceptance = await resolveAcceptanceRole(client, {
+      communityId: invitation.community_id,
+      inviterUserId: invitation.inviter_user_id,
+      roleId: invitation.role_id,
+    });
+
     const membership = await createMembership({
       communityId: invitation.community_id,
       userId: invitedUserId,
@@ -587,6 +622,7 @@ async function acceptInvitation({ invitationToken, invitationId, invitedUserId }
       actorUserId: invitedUserId,
       client,
       initialStatus: 'active',
+      roleId: acceptance.role.id,
     });
 
     const updatedInvitationResult = await client.query(

@@ -120,11 +120,35 @@ test('a verified underpayment marks the payment failed and leaves the contributi
   assert.equal(contribution.rows[0].paid_amount, '0.00');
 });
 
+test('a verified success for a different transaction reference does not settle the payment', async () => {
+  const { admin, contributionId, payment } = await createPendingPayment('300.00');
+
+  const { outcome } = await verifyPaymentWithProvider(payment, admin.id, {
+    providerFactory: fakeProvider({
+      status: 'successful',
+      amount: '300.00',
+      currency: 'ETB',
+      providerReference: 'YEGNA-PAY-someone-else',
+    }),
+  });
+
+  assert.equal(outcome, 'failed');
+
+  const contribution = await pool.query('SELECT paid_amount FROM contributions WHERE id = $1', [contributionId]);
+
+  assert.equal(contribution.rows[0].paid_amount, '0.00');
+});
+
 test('a verified matching payment settles through processing to successful', async () => {
   const { admin, contributionId, payment } = await createPendingPayment('300.00');
 
   const { outcome, payment: settled } = await verifyPaymentWithProvider(payment, admin.id, {
-    providerFactory: fakeProvider({ status: 'successful', amount: '300.00', currency: 'ETB' }),
+    providerFactory: fakeProvider({
+      status: 'successful',
+      amount: '300.00',
+      currency: 'ETB',
+      providerReference: `YEGNA-PAY-${payment.id}`,
+    }),
   });
 
   assert.equal(outcome, 'successful');

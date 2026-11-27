@@ -54,15 +54,14 @@ export function signInAs(
 }
 /** Quiet default data for the screens a signed-in user lands on. Override per test as needed. */
 export function mockWorkspace(options: { permissions?: string[] } = {}) {
-  mockApi('get', '/communities/me', () => {
-    console.log('[reports-test] /communities/me MOCK HIT');
-
-    return ok(
+  mockApi('get', '/communities/me', () =>
+    ok(
       { memberships: [myCommunityFixture(options.permissions ?? [])] },
       { pagination: pagination(1) },
-    );
-  });
+    ),
+  );
   mockApi('get', '/contributions/me', () => ok({ contributions: [], summary: [] }, { pagination: pagination(0) }));
   mockApi('get', '/payments/me', () => ok({ payments: [], summary: [] }, { pagination: pagination(0) }));
   mockApi('get', '/notifications', () => ok([], { pagination: { limit: 5, offset: 0, count: 0 } }));
+  mockApi('get', '/announcements/me', () => ok({ announcements: [] }));
 }

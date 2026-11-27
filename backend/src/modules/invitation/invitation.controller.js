@@ -11,6 +11,7 @@ const {
 const {
   validateInvitationId,
   validateListMyInvitationsQuery,
+  readInvitationTarget,
 } = require('./invitation.validation');
 const { buildPagination } = require('../../utils/pagination');
 
@@ -24,13 +25,15 @@ function getRequestContext(req) {
 async function create(req, res, next) {
   try {
     const { communityId } = req.params;
-    const { invitedUserId, metadata } = req.body;
+    const target = readInvitationTarget(req.body);
 
     const invitation = await createInvitation({
       communityId,
       inviterUserId: req.user.id,
-      invitedUserId,
-      metadata,
+      invitedUserId: target.invitedUserId,
+      email: target.email,
+      roleId: target.roleId,
+      metadata: target.metadata,
       ...getRequestContext(req),
     });
 

@@ -1,5 +1,6 @@
 const { pool } = require('../../config/database');
 const { createAuditLog } = require('../audit/audit.service');
+const { ensureRoleForActiveMembership } = require('../role/role.service');
 const { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } = require('../audit/audit.constants');
 const { NOTIFICATION_TYPE } = require('../notification/notification.constants');
 const { notifySafely } = require('../notification/notification.events');
@@ -107,7 +108,18 @@ async function listMembers(communityId) {
         up.first_name,
         up.middle_name,
         up.last_name,
-        up.display_name
+        up.display_name,
+
+        COALESCE(
+          (
+            SELECT json_agg(json_build_object('id', cr.id, 'name', cr.name) ORDER BY cr.name)
+            FROM membership_roles mr
+            JOIN community_roles cr ON cr.id = mr.role_id
+            WHERE mr.membership_id = cm.id
+              AND mr.revoked_at IS NULL
+          ),
+          '[]'::JSON
+        ) AS roles
       FROM community_memberships cm
       JOIN users u
         ON u.id = cm.user_id
@@ -171,6 +183,7 @@ async function createMembership({
   actorUserId,
   client: providedClient = null,
   initialStatus = null,
+  roleId = null,
 }) {
   await ensureCommunityExists(communityId);
   await ensureUserExists(userId);
@@ -285,6 +298,16 @@ async function createMembership({
         },
       });
 
+      if (status === 'active') {
+        await ensureRoleForActiveMembership(client, {
+          communityId,
+          membershipId: membership.id,
+          roleId,
+          actorUserId,
+          reason: roleId ? null : 'Rejoining assigns the member role.',
+        });
+      }
+
       if (ownsTransaction) {
         await client.query('COMMIT');
       }
@@ -351,6 +374,15 @@ async function createMembership({
         leftAt: membership.left_at,
       },
     });
+
+    if (status === 'active') {
+      await ensureRoleForActiveMembership(client, {
+        communityId,
+        membershipId: membership.id,
+        roleId,
+        actorUserId,
+      });
+    }
 
     if (ownsTransaction) {
       await client.query('COMMIT');
@@ -589,6 +621,16 @@ async function changeMembershipStatus(communityId, membershipId, newStatus, acto
             suspended: AUDIT_ACTIONS.MEMBERSHIP_SUSPENDED,
             left: AUDIT_ACTIONS.MEMBERSHIP_REMOVED,
           }[newStatus];
+
+    if (newStatus === 'active' && current.status !== 'suspended') {
+      await ensureRoleForActiveMembership(client, {
+        communityId,
+        membershipId: membership.id,
+        actorUserId,
+        onlyIfMissing: true,
+        reason: 'Membership activation assigns the member role when none was chosen.',
+      });
+    }
 
     await createAuditLog({
       userId: actorUserId,

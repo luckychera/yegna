@@ -9,13 +9,28 @@ function createValidationError(message, code = 'VALIDATION_ERROR') {
   return error;
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function validateCreateInvitation(data) {
   if (!data || typeof data !== 'object') {
     throw createValidationError('Request body is required');
   }
 
-  if (typeof data.invitedUserId !== 'string' || !data.invitedUserId.trim()) {
-    throw createValidationError('invitedUserId is required');
+  const invitedUserId = typeof data.invitedUserId === 'string' ? data.invitedUserId.trim() : '';
+  const email = typeof data.email === 'string' ? data.email.trim() : '';
+
+  if (!invitedUserId && !email) {
+    throw createValidationError('invitedUserId or email is required');
+  }
+
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw createValidationError('email must be a valid email address');
+  }
+
+  if (data.roleId !== undefined && data.roleId !== null && data.roleId !== '') {
+    if (typeof data.roleId !== 'string' || !UUID_PATTERN.test(data.roleId)) {
+      throw createValidationError('roleId must be a valid role id');
+    }
   }
 
   if (data.metadata !== undefined) {
@@ -50,4 +65,18 @@ module.exports = {
 
   validateCreateInvitation,
   validateInvitationId,
+  readInvitationTarget: (data) => {
+    validateCreateInvitation(data);
+
+    const invitedUserId = typeof data.invitedUserId === 'string' ? data.invitedUserId.trim() : '';
+    const email = typeof data.email === 'string' ? data.email.trim() : '';
+    const roleId = data.roleId || null;
+
+    return {
+      invitedUserId: invitedUserId || null,
+      email: email || null,
+      roleId,
+      metadata: data.metadata,
+    };
+  },
 };

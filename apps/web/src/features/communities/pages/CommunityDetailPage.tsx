@@ -13,6 +13,7 @@ import { buttonVariants } from '@/components/ui/button-variants';
 import { Card, CardContent } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
+import { CommunityAnnouncementsPanel } from '@/features/announcements/components/CommunityAnnouncementsPanel';
 import { CommunityContributionsPanel } from '@/features/contributions/components/CommunityContributionsPanel';
 import { CommunityInvitationsPanel } from '@/features/invitations/components/CommunityInvitationsPanel';
 import { MembersPanel } from '@/features/memberships/components/MembersPanel';
@@ -67,10 +68,11 @@ export function CommunityDetailPage() {
 
   const tabs = [
     { value: 'about', label: 'About', show: true },
+    { value: 'announcements', label: 'Announcements', show: status === 'active' },
     { value: 'members', label: 'Members', show: can(PERMISSIONS.MEMBERS_VIEW) },
     { value: 'contributions', label: 'Contributions', show: can(PERMISSIONS.CONTRIBUTIONS_VIEW) },
     { value: 'payments', label: 'Payments', show: can(PERMISSIONS.PAYMENTS_VIEW) },
-    { value: 'invitations', label: 'Invitations', show: can(PERMISSIONS.MEMBERS_VIEW) },
+    { value: 'invitations', label: 'Invitations', show: can(PERMISSIONS.MEMBERS_INVITE) || can(PERMISSIONS.MEMBERS_VIEW) },
   ].filter((tab) => tab.show);
 
   const tab = tabs.find((item) => item.value === params.get('tab'))?.value ?? 'about';
@@ -157,7 +159,25 @@ export function CommunityDetailPage() {
         </CardContent>
       </Card>
 
-      <Tabs value={tab} onValueChange={(value) => setParams(value === 'about' ? {} : { tab: value }, { replace: true })} className="mt-6">
+      <Tabs
+        value={tab}
+        onValueChange={(value) => {
+          if (value === 'about') {
+            setParams({}, { replace: true });
+            return;
+          }
+
+          const next = new URLSearchParams();
+          next.set('tab', value);
+
+          if (value === 'announcements' && params.get('announcement')) {
+            next.set('announcement', params.get('announcement') ?? '');
+          }
+
+          setParams(next, { replace: true });
+        }}
+        className="mt-6"
+      >
         <TabsList aria-label="Community sections">
           {tabs.map((item) => (
             <TabsTrigger key={item.value} value={item.value}>
@@ -215,9 +235,20 @@ export function CommunityDetailPage() {
           ) : null}
         </TabsContent>
 
+        {status === 'active' ? (
+          <TabsContent value="announcements">
+            <CommunityAnnouncementsPanel communityId={community.id} canManage={can(PERMISSIONS.ANNOUNCEMENTS_MANAGE)} />
+          </TabsContent>
+        ) : null}
+
         {can(PERMISSIONS.MEMBERS_VIEW) ? (
           <TabsContent value="members">
-            <MembersPanel communityId={community.id} canUpdate={can(PERMISSIONS.MEMBERS_UPDATE)} canRemove={can(PERMISSIONS.MEMBERS_REMOVE)} />
+            <MembersPanel
+              communityId={community.id}
+              canUpdate={can(PERMISSIONS.MEMBERS_UPDATE)}
+              canRemove={can(PERMISSIONS.MEMBERS_REMOVE)}
+              canAssignRoles={can(PERMISSIONS.ROLES_ASSIGN)}
+            />
           </TabsContent>
         ) : null}
 
@@ -239,9 +270,14 @@ export function CommunityDetailPage() {
           </TabsContent>
         ) : null}
 
-        {can(PERMISSIONS.MEMBERS_VIEW) ? (
+        {can(PERMISSIONS.MEMBERS_INVITE) || can(PERMISSIONS.MEMBERS_VIEW) ? (
           <TabsContent value="invitations">
-            <CommunityInvitationsPanel communityId={community.id} canInvite={can(PERMISSIONS.MEMBERS_INVITE)} canViewMembers />
+            <CommunityInvitationsPanel
+              communityId={community.id}
+              canInvite={can(PERMISSIONS.MEMBERS_INVITE)}
+              canViewMembers={can(PERMISSIONS.MEMBERS_VIEW)}
+              canAssignRoles={can(PERMISSIONS.ROLES_ASSIGN)}
+            />
           </TabsContent>
         ) : null}
       </Tabs>

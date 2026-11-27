@@ -209,13 +209,14 @@ describe('CommunityDetailPage', () => {
     mockApi('get', '/communities/community-1/members', () => ok({ members: rows }));
   }
 
-  it('gives an ordinary member the About view only, with no admin controls', async () => {
+  it('gives an ordinary active member About and Announcements, with no admin controls', async () => {
     signInAs();
     mockWorkspace({ permissions: [] });
     renderApp('/communities/community-1');
 
     expect(await screen.findByRole('heading', { name: 'Bole Community' })).toBeInTheDocument();
-    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['About']);
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['About', 'Announcements']);
+    expect(screen.queryByRole('button', { name: 'New announcement' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
     expect(within(screen.getByRole('main')).queryByRole('link', { name: 'Reports' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Leave' })).toBeInTheDocument();
@@ -228,7 +229,14 @@ describe('CommunityDetailPage', () => {
     renderApp('/communities/community-1');
 
     await screen.findByRole('heading', { name: 'Bole Community' });
-    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['About', 'Members', 'Contributions', 'Payments', 'Invitations']);
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'About',
+      'Announcements',
+      'Members',
+      'Contributions',
+      'Payments',
+      'Invitations',
+    ]);
     expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
     expect(within(screen.getByRole('main')).getByRole('link', { name: 'Reports' })).toHaveAttribute('href', '/reports?community=community-1');
   });
@@ -352,5 +360,112 @@ describe('CommunityDetailPage', () => {
     renderApp('/communities/community-1?tab=members');
 
     expect(await screen.findByText('Permission denied')).toBeInTheDocument();
+  });
+
+  it('lets an administrator invite someone into a role they are allowed to assign', async () => {
+    const user = userEvent.setup();
+    let sent: Record<string, unknown> | null = null;
+
+    signInAs();
+    mockWorkspace({ permissions: ADMIN_PERMISSIONS });
+    mockApi('get', '/communities/community-1/invitations', () => ok([]));
+    mockApi('get', '/communities/community-1/roles/assignable', () =>
+      ok({
+        roles: [
+          { id: 'role-member', name: 'member', description: 'Joins as a member.' },
+          { id: 'role-treasurer', name: 'treasurer', description: 'Records contributions and payments.' },
+        ],
+      }),
+    );
+    mockApi('post', '/communities/community-1/invitations', async ({ request }) => {
+      sent = (await request.json()) as Record<string, unknown>;
+
+      return ok({});
+    });
+    renderApp('/communities/community-1?tab=invitations');
+
+    await user.click(await screen.findByRole('button', { name: 'Invite someone' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Invite someone' });
+    await user.type(within(dialog).getByLabelText('Email'), 'guest@example.com');
+    expect(await within(dialog).findByRole('option', { name: 'Treasurer' })).toBeInTheDocument();
+    await user.selectOptions(within(dialog).getByLabelText('Role'), 'role-treasurer');
+    expect(within(dialog).getByText('Records contributions and payments.')).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Send invitation' }));
+
+    expect(await screen.findByText('Invitation sent')).toBeInTheDocument();
+    expect(sent).toEqual({ email: 'guest@example.com', roleId: 'role-treasurer' });
+  });
+
+  it('invites an ordinary member without a role choice', async () => {
+    const user = userEvent.setup();
+    let sent: Record<string, unknown> | null = null;
+
+    signInAs();
+    mockWorkspace({ permissions: ['community.view', 'members.invite'] });
+    mockApi('get', '/communities/community-1/invitations', () => ok([]));
+    mockApi('post', '/communities/community-1/invitations', async ({ request }) => {
+      sent = (await request.json()) as Record<string, unknown>;
+
+      return ok({});
+    });
+    renderApp('/communities/community-1?tab=invitations');
+
+    expect(await screen.findByText(/join as members/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Invite someone' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Invite someone' });
+    expect(within(dialog).queryByLabelText('Role')).not.toBeInTheDocument();
+    expect(within(dialog).getByText('This person joins as a member.')).toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText('Email'), 'guest@example.com');
+    await user.click(within(dialog).getByRole('button', { name: 'Send invitation' }));
+
+    expect(await screen.findByText('Invitation sent')).toBeInTheDocument();
+    expect(sent).toEqual({ email: 'guest@example.com' });
+  });
+
+  it('shows a new role only after the backend accepts the change', async () => {
+    const user = userEvent.setup();
+    let roles = [{ id: 'role-member', name: 'member' }];
+
+    signInAs();
+    mockWorkspace({ permissions: ADMIN_PERMISSIONS });
+    mockApi('get', '/communities/community-1/members', () =>
+      ok({ members: [memberRow({ id: 'm-selam', user_id: 'u-selam', roles })] }),
+    );
+    mockApi('get', '/communities/community-1/roles/assignable', () =>
+      ok({
+        roles: [
+          { id: 'role-member', name: 'member', description: 'Joins as a member.' },
+          { id: 'role-secretary', name: 'secretary', description: 'Keeps the member list.' },
+        ],
+      }),
+    );
+    mockApi('post', '/communities/community-1/members/m-selam/role', () =>
+      fail(403, 'ROLE_ASSIGNMENT_DENIED', 'You cannot assign that role'),
+    );
+    renderApp('/communities/community-1?tab=members');
+
+    const row = () => within(screen.getByRole('table', { name: 'Community members' })).getByRole('row', { name: /Selam Tadesse/ });
+
+    expect(await screen.findByRole('button', { name: 'Change role for Selam Tadesse' })).toBeInTheDocument();
+    expect(within(row()).getByText('Member')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Change role for Selam Tadesse' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Change role for Selam Tadesse' });
+    expect(await within(dialog).findByRole('option', { name: 'Secretary' })).toBeInTheDocument();
+    await user.selectOptions(within(dialog).getByLabelText('Role'), 'role-secretary');
+    await user.click(within(dialog).getByRole('button', { name: 'Update role' }));
+
+    expect(await screen.findByText("You don't have permission to perform this action.")).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Change role for Selam Tadesse' })).toBeInTheDocument();
+
+    mockApi('post', '/communities/community-1/members/m-selam/role', () => {
+      roles = [{ id: 'role-secretary', name: 'secretary' }];
+
+      return ok({});
+    });
+    await user.click(within(dialog).getByRole('button', { name: 'Update role' }));
+
+    expect(await screen.findByText('Role updated')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Change role for Selam Tadesse' })).not.toBeInTheDocument();
+    expect(await within(row()).findByText('Secretary')).toBeInTheDocument();
   });
 });

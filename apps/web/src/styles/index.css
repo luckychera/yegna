@@ -12,14 +12,17 @@
   --color-secondary: #0a9669;
   --color-accent: #10b981;
   --color-primary-soft: #e6f4f1;
+  /* Text and icons drawn on a solid primary or danger fill. */
+  --color-on-primary: #ffffff;
+  --color-on-danger: #ffffff;
 
   --color-background: #f8fafc;
   --color-surface: #ffffff;
   --color-surface-soft: #f1f7f5;
 
   --color-ink: #0f172a;
-  --color-ink-secondary: #64748b;
-  --color-ink-muted: #94a3b8;
+  --color-ink-secondary: #475569;
+  --color-ink-muted: #526070;
   --color-line: #e2e8f0;
 
   --color-success: #10b981;
@@ -98,6 +101,9 @@
   --color-secondary: #35b88f;
   --color-accent: #4adea8;
   --color-primary-soft: #153b36;
+  /* The dark theme's light primary and danger fills need dark text for contrast. */
+  --color-on-primary: #04211c;
+  --color-on-danger: #2a0a10;
 
   --color-background: #0b1720;
   --color-surface: #14232d;
@@ -105,7 +111,7 @@
 
   --color-ink: #f1f5f9;
   --color-ink-secondary: #a3b3c0;
-  --color-ink-muted: #778b99;
+  --color-ink-muted: #8aa0ae;
   --color-line: #293d48;
 
   --color-success: #34d399;

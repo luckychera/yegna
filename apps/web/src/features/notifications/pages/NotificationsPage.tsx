@@ -47,7 +47,7 @@ export function NotificationsPage() {
       }
     }
 
-    const target = notificationTarget(notification.type, notification.communityId);
+    const target = notificationTarget(notification.type, notification.communityId, notification.entityId);
 
     if (target) navigate(target);
   }

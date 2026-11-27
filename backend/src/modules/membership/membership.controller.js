@@ -7,6 +7,7 @@ const {
   joinCommunity,
   leaveCommunity,
 } = require('./membership.service');
+const { changeMemberRole, listAssignableRoles } = require('../role/role.service');
 
 const {
   validateCreateMembershipInput,
@@ -14,6 +15,49 @@ const {
   validateMembershipId,
   validateCommunityId,
 } = require('./membership.validation');
+
+async function assignableRoles(req, res, next) {
+  try {
+    const roles = await listAssignableRoles({
+      communityId: req.params.communityId,
+      actorUserId: req.user.id,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: { roles },
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function changeRole(req, res, next) {
+  try {
+    const roleId = req.body?.roleId;
+
+    if (typeof roleId !== 'string' || !/^[0-9a-f-]{36}$/i.test(roleId)) {
+      const error = new Error('roleId must be a valid role id');
+      error.statusCode = 400;
+      error.code = 'VALIDATION_ERROR';
+      throw error;
+    }
+
+    const result = await changeMemberRole({
+      communityId: req.params.communityId,
+      membershipId: req.params.membershipId,
+      roleId,
+      actorUserId: req.user.id,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
 
 async function list(req, res, next) {
   try {
@@ -243,4 +287,6 @@ module.exports = {
   reject,
   suspend,
   remove,
+  assignableRoles,
+  changeRole,
 };

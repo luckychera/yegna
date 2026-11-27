@@ -36,6 +36,15 @@ export function useCommunityInvitations(communityId: string, enabled: boolean) {
   });
 }
 
+export function useCreateInvitation(communityId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: { email: string; roleId?: string }) => invitationApi.create(communityId, input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.communityInvitations(communityId) }),
+  });
+}
+
 export function useRevokeInvitation(communityId: string) {
   const queryClient = useQueryClient();
 

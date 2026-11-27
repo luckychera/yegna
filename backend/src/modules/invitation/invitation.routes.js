@@ -1,7 +1,7 @@
 const express = require('express');
 
 const { authenticate } = require('../auth/auth.middleware');
-const { requirePermission } = require('../../middleware/authorization.middleware');
+const { requirePermission, requireAnyPermission } = require('../../middleware/authorization.middleware');
 
 const {
   create,
@@ -27,7 +27,7 @@ router.post(
 router.get(
   '/communities/:communityId/invitations',
   authenticate,
-  requirePermission('members.view'),
+  requireAnyPermission(['members.invite', 'members.view']),
   list,
 );
 

@@ -24,6 +24,8 @@ The platform is inspired by traditional Ethiopian community structures such as *
 
 Instead of replacing the culture and social structures that already work, Digital Community provides the **secure digital infrastructure around them**.
 
+To run the API and the web app locally, see [docs/OPERATIONS.md](docs/OPERATIONS.md). The API reads `backend/.env`, not a file at the repository root.
+
 ---
 
 ## 📌 Project Vision

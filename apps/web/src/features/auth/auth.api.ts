@@ -33,12 +33,8 @@ export const authApi = {
   },
 
   async updateProfile(input: UpdateProfileInput): Promise<UserProfile> {
-    const { data } = await api.patch<{
-      success: boolean;
-      message: string;
-      data: UserProfile;
-    }>('/users/me', input);
+    const { data } = await api.patch<UserProfile>('/users/me', input);
 
-    return data.data;
+    return data;
   },
 };

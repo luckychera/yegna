@@ -10,11 +10,12 @@ import { Button } from '@/components/ui/Button';
 import { buttonVariants } from '@/components/ui/button-variants';
 import { Avatar } from '@/components/ui/Avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { MyAnnouncementsPanel } from '@/features/announcements/components/MyAnnouncementsPanel';
 import { useMyCommunities } from '@/features/communities/community.hooks';
 import { useMyContributions } from '@/features/contributions/contribution.hooks';
 import { isPayable } from '@/features/contributions/contribution.types';
 import { useNotifications, useUnreadCount } from '@/features/notifications/notification.hooks';
-import { notificationVisual } from '@/features/notifications/notification-visuals';
+import { notificationTarget, notificationVisual } from '@/features/notifications/notification-visuals';
 import { useMyPayments } from '@/features/payments/payment.hooks';
 import { formatDueLabel, formatRelative, greetingFor } from '@/lib/formatting/date';
 import { formatMoney } from '@/lib/formatting/money';
@@ -116,7 +117,9 @@ export function DashboardPage() {
           }
         />
       ) : (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="space-y-6">
+          <MyAnnouncementsPanel />
+          <div className="grid gap-6 lg:grid-cols-2">
           <Card className="group relative overflow-hidden animate-dashboard-rise dashboard-delay-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-pop motion-reduce:transform-none motion-reduce:transition-none">
             <CardHeader>
               <CardTitle>Recent Activity</CardTitle>
@@ -139,12 +142,12 @@ export function DashboardPage() {
                 <ul className="divide-y divide-line">
                   {activity.data.items.map((item) => {
                     const { icon: Icon, tone } = notificationVisual(item.type);
+                    const target = notificationTarget(item.type, item.communityId, item.entityId);
+                    const rowClass =
+                      'group -mx-2 flex items-start gap-3 rounded-xl px-2 py-3 transition-colors duration-200 hover:bg-surface-soft first:pt-3 last:pb-3 motion-reduce:transition-none';
 
-                    return (
-                      <li
-                        key={item.id}
-                        className="group -mx-2 flex items-start gap-3 rounded-xl px-2 py-3 transition-colors duration-200 hover:bg-surface-soft first:pt-3 last:pb-3 motion-reduce:transition-none "
-                      >
+                    const body = (
+                      <>
                         <span
                           className={cn(
                             'flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-transform duration-200 group-hover:scale-105 motion-reduce:transform-none motion-reduce:transition-none',
@@ -169,6 +172,18 @@ export function DashboardPage() {
                         >
                           {formatRelative(item.createdAt)}
                         </time>
+                      </>
+                    );
+
+                    return (
+                      <li key={item.id}>
+                        {target ? (
+                          <Link to={target} className={cn(rowClass, 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary')}>
+                            {body}
+                          </Link>
+                        ) : (
+                          <div className={rowClass}>{body}</div>
+                        )}
                       </li>
                     );
                   })}
@@ -241,6 +256,7 @@ export function DashboardPage() {
               ) : null}
             </CardContent>
           </Card>
+          </div>
         </div>
       )}
     </div>

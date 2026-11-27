@@ -39,8 +39,12 @@ function toMemberPayment(row) {
   };
 }
 
-// A provider "success" only settles the payment when it is for the amount and
-// currency Yegna asked for; anything else is treated as a failed payment.
+// A provider "success" only settles the payment when it is for this payment's
+// reference, amount, and currency. Anything else is treated as a failed payment.
+function matchesVerifiedReference(payment, providerResult) {
+  return providerResult.providerReference === providerReferenceFor(payment.id);
+}
+
 function matchesVerifiedAmount(payment, providerResult) {
   if (providerResult.amount == null || !providerResult.currency) {
     return false;
@@ -118,9 +122,9 @@ async function verifyPaymentWithProvider(payment, actorUserId, { providerFactory
   }
 
   if (providerResult.status === 'successful') {
-    if (!matchesVerifiedAmount(payment, providerResult)) {
+    if (!matchesVerifiedReference(payment, providerResult) || !matchesVerifiedAmount(payment, providerResult)) {
       const failed = await transition(payment, PAYMENT_STATUS.FAILED, actorUserId, {
-        failureReason: 'Verified amount or currency did not match the payment',
+        failureReason: 'Verified reference, amount, or currency did not match the payment',
       });
 
       return { payment: failed, outcome: failed.status };
@@ -157,6 +161,7 @@ async function verifyPaymentWithProvider(payment, actorUserId, { providerFactory
 module.exports = {
   providerReferenceFor,
   toMemberPayment,
+  matchesVerifiedReference,
   matchesVerifiedAmount,
   verifyPaymentWithProvider,
 };

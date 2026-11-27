@@ -385,7 +385,7 @@ test('an admin cannot revoke another community\'s invitation through their own c
   assert.equal(stored.rows[0].status, 'pending');
 });
 
-test('a member with no roles cannot list or revoke invitations', async () => {
+test('an active member can list invitations and revoke one they are allowed to invite', async () => {
   const fixture = await setup();
   const plainMember = await ctx.createUser();
   const invitation = await invite(fixture);
@@ -401,12 +401,12 @@ test('a member with no roles cannot list or revoke invitations', async () => {
     { token: plainMember.token },
   );
 
-  assert.equal(list.status, 403);
-  assert.equal(revoke.status, 403);
+  assert.equal(list.status, 200);
+  assert.equal(revoke.status, 200);
 
   const stored = await pool.query('SELECT status FROM community_invitations WHERE id = $1', [invitation.id]);
 
-  assert.equal(stored.rows[0].status, 'pending');
+  assert.equal(stored.rows[0].status, 'revoked');
 });
 
 test('reject with a malformed invitation ID returns 400', async () => {

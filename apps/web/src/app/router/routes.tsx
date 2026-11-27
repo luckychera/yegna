@@ -13,6 +13,7 @@ function lazyPage<M>(load: () => Promise<M>, pick: (module: M) => React.Componen
 
 export const appRoutes: RouteObject[] = [
   { path: '/', element: <Navigate to="/dashboard" replace /> },
+  { path: '/verify/:code', lazy: lazyPage(() => import('@/features/profile/pages/VerifyCardPage'), (m) => m.VerifyCardPage) },
   {
     // Registration manages its own signed-in redirect so the "Complete" step can be shown.
     element: <AuthLayout />,

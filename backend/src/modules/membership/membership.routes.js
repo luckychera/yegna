@@ -17,9 +17,25 @@ const {
   remove,
   join,
   leave,
+  assignableRoles,
+  changeRole,
 } = require('./membership.controller');
 
 const router = express.Router();
+
+router.get(
+  '/:communityId/roles/assignable',
+  authenticate,
+  requirePermission(PERMISSIONS.MEMBERS_INVITE),
+  assignableRoles,
+);
+
+router.post(
+  '/:communityId/members/:membershipId/role',
+  authenticate,
+  requirePermission(PERMISSIONS.ROLES_ASSIGN),
+  changeRole,
+);
 
 router.get(
   '/:communityId/members',

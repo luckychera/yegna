@@ -8,6 +8,7 @@ interface RawInvitation {
   invited_user_id: string;
   expires_at: string;
   created_at: string;
+  role_name?: string | null;
 }
 
 export const invitationApi = {
@@ -40,7 +41,15 @@ export const invitationApi = {
       invitedUserId: row.invited_user_id,
       expiresAt: row.expires_at,
       createdAt: row.created_at,
+      roleName: row.role_name ?? null,
     }));
+  },
+
+  async create(communityId: string, input: { email: string; roleId?: string }): Promise<void> {
+    await api.post(`/communities/${communityId}/invitations`, {
+      email: input.email,
+      ...(input.roleId ? { roleId: input.roleId } : {}),
+    });
   },
 
   async revoke(communityId: string, invitationId: string): Promise<void> {

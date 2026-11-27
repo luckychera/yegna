@@ -78,9 +78,30 @@ function requireRole(roleName) {
   };
 }
 
-// Any active member, whether or not they hold a role. Regular members joined
-// through a request or invitation have no role, so content meant for every
-// member (such as announcements) cannot be gated on a permission.
+function requireAnyPermission(permissions) {
+  return async (req, res, next) => {
+    try {
+      const authorization = await resolveCommunityAuthorization(req, res);
+
+      if (!authorization) return undefined;
+
+      const allowed = permissions.some((permission) => authorization.permissions.includes(permission));
+
+      if (!allowed) {
+        return deny(res, 403, 'PERMISSION_DENIED', 'You do not have permission to perform this action');
+      }
+
+      req.authorization = authorization;
+
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  };
+}
+
+// Any active member. Announcements stay available to every active member,
+// including one whose only role is member.
 function requireActiveMembership() {
   return async (req, res, next) => {
     try {
@@ -99,6 +120,7 @@ function requireActiveMembership() {
 
 module.exports = {
   requirePermission,
+  requireAnyPermission,
   requireRole,
   requireActiveMembership,
 };

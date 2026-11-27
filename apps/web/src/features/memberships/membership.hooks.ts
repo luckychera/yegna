@@ -12,6 +12,24 @@ export function useCommunityMembers(communityId: string, enabled: boolean) {
   });
 }
 
+export function useAssignableRoles(communityId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.assignableRoles(communityId),
+    queryFn: ({ signal }) => membershipApi.assignableRoles(communityId, signal),
+    enabled,
+  });
+}
+
+export function useChangeMemberRole(communityId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ membershipId, roleId }: { membershipId: string; roleId: string }) =>
+      membershipApi.changeRole(communityId, membershipId, roleId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.members(communityId) }),
+  });
+}
+
 export function useMemberAction(communityId: string) {
   const queryClient = useQueryClient();
 

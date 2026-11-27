@@ -27,6 +27,8 @@ const AUDIT_ACTIONS = Object.freeze({
   PAYMENT_SUCCESSFUL: 'payment.successful',
   PAYMENT_REFUNDED: 'payment.refunded',
 
+  ROLE_CHANGED: 'role.changed',
+
   ANNOUNCEMENT_PUBLISHED: 'announcement.published',
   ANNOUNCEMENT_UPDATED: 'announcement.updated',
   ANNOUNCEMENT_ARCHIVED: 'announcement.archived',

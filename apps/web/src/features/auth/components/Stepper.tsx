@@ -19,7 +19,7 @@ export function Stepper({ steps, current }: { steps: string[]; current: number }
               <span
                 className={cn(
                   'flex h-8 w-8 items-center justify-center rounded-full text-label font-semibold',
-                  done || active ? 'bg-primary text-white' : 'bg-surface-soft text-ink-secondary',
+                  done || active ? 'bg-primary text-on-primary' : 'bg-surface-soft text-ink-secondary',
                 )}
               >
                 {done ? <Check className="h-4 w-4" aria-hidden /> : index + 1}

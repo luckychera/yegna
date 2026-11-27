@@ -41,13 +41,35 @@ export function notificationVisual(type: string): NotificationVisual {
   return VISUALS[type] ?? { icon: Bell, tone: 'neutral' };
 }
 
-/** Where tapping a notification should lead, derived from its type. */
-export function notificationTarget(type: string, communityId: string | null): string | null {
+/**
+ * Where tapping a notification should lead, derived from its type.
+ * Announcements open the community tab, and the announcement itself when its id is present.
+ * A missing community id is not guessed.
+ */
+export function notificationTarget(
+  type: string,
+  communityId: string | null,
+  entityId: string | null = null,
+): string | null {
   if (type.startsWith('invitation')) return '/invitations';
   if (type.startsWith('membership')) return '/memberships';
   if (type.startsWith('contribution')) return '/contributions';
   if (type.startsWith('payment')) return '/payments';
-  if (type === 'community_announcement' && communityId) return `/communities/${communityId}`;
+
+  if (type === 'community_announcement') {
+    const community = communityId?.trim();
+
+    // A missing or blank community cannot be guessed, and the id is encoded so it
+    // stays one path segment.
+    if (!community) return null;
+
+    const params = new URLSearchParams({ tab: 'announcements' });
+    const announcement = entityId?.trim();
+
+    if (announcement) params.set('announcement', announcement);
+
+    return `/communities/${encodeURIComponent(community)}?${params.toString()}`;
+  }
 
   return null;
 }

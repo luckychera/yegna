@@ -167,4 +167,6 @@ export const ADMIN_PERMISSIONS = [
   'contributions.update',
   'payments.view',
   'reports.view',
+  'announcements.manage',
+  'roles.assign',
 ];

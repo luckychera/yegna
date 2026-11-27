@@ -7,13 +7,14 @@ import { StatusBadge } from '@/components/data-display/StatusBadge';
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/feedback/states';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
-import { ConfirmDialog } from '@/components/ui/Dialog';
-import { FilterSelect, SearchInput } from '@/components/ui/Field';
+import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
+import { SelectField, FilterSelect, SearchInput } from '@/components/ui/Field';
 import { Pagination } from '@/components/ui/Pagination';
 import type { MembershipStatus } from '@/features/communities/community.types';
 import { runAction } from '@/lib/api/action';
 import { formatDate } from '@/lib/formatting/date';
-import { useCommunityMembers, useMemberAction } from '../membership.hooks';
+import { humanize } from '@/lib/formatting/text';
+import { useAssignableRoles, useChangeMemberRole, useCommunityMembers, useMemberAction } from '../membership.hooks';
 import type { Member, MemberAction } from '../membership.types';
 
 const PAGE_SIZE = 10;
@@ -95,9 +96,10 @@ interface MembersPanelProps {
   communityId: string;
   canUpdate: boolean;
   canRemove: boolean;
+  canAssignRoles: boolean;
 }
 
-export function MembersPanel({ communityId, canUpdate, canRemove }: MembersPanelProps) {
+export function MembersPanel({ communityId, canUpdate, canRemove, canAssignRoles }: MembersPanelProps) {
   const { profile } = useAuth();
   const members = useCommunityMembers(communityId, true);
   const act = useMemberAction(communityId);
@@ -106,6 +108,7 @@ export function MembersPanel({ communityId, canUpdate, canRemove }: MembersPanel
   const [status, setStatus] = useState('');
   const [offset, setOffset] = useState(0);
   const [pending, setPending] = useState<{ member: Member; key: string } | null>(null);
+  const [roleTarget, setRoleTarget] = useState<Member | null>(null);
 
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -145,6 +148,11 @@ export function MembersPanel({ communityId, canUpdate, canRemove }: MembersPanel
       ),
     },
     { key: 'joined', header: 'Joined', cell: (member) => formatDate(member.joinedAt) },
+    {
+      key: 'role',
+      header: 'Role',
+      cell: (member) => (member.roles[0] ? humanize(member.roles[0].name) : '—'),
+    },
     { key: 'status', header: 'Status', cell: (member) => <StatusBadge kind="membership" status={member.status} /> },
     {
       key: 'actions',
@@ -157,9 +165,16 @@ export function MembersPanel({ communityId, canUpdate, canRemove }: MembersPanel
           return <span className="text-small text-ink-muted">You</span>;
         }
 
+        const actions = availableActions(member, canUpdate, canRemove);
+
         return (
           <span className="flex flex-wrap justify-end gap-2">
-            {availableActions(member, canUpdate, canRemove).map((key) => (
+            {canAssignRoles && member.status === 'active' ? (
+              <Button size="sm" variant="outline" onClick={() => setRoleTarget(member)} aria-label={`Change role for ${member.name}`}>
+                Change role
+              </Button>
+            ) : null}
+            {actions.map((key) => (
               <Button
                 key={key}
                 size="sm"
@@ -229,6 +244,8 @@ export function MembersPanel({ communityId, canUpdate, canRemove }: MembersPanel
         </>
       )}
 
+      <RoleDialog communityId={communityId} member={roleTarget} onClose={() => setRoleTarget(null)} />
+
       <ConfirmDialog
         open={pending !== null}
         onOpenChange={(open) => {
@@ -242,5 +259,68 @@ export function MembersPanel({ communityId, canUpdate, canRemove }: MembersPanel
         onConfirm={confirm}
       />
     </div>
+  );
+}
+
+function RoleDialog({ communityId, member, onClose }: { communityId: string; member: Member | null; onClose: () => void }) {
+  const roles = useAssignableRoles(communityId, member !== null);
+  const change = useChangeMemberRole(communityId);
+  const [roleId, setRoleId] = useState('');
+
+  const current = member?.roles[0]?.id;
+  const selected = roleId || current || roles.data?.[0]?.id || '';
+  const selectedRole = roles.data?.find((role) => role.id === selected);
+
+  async function confirm() {
+    if (!member || !selected) return;
+
+    const ok = await runAction(
+      () => change.mutateAsync({ membershipId: member.id, roleId: selected }),
+      'Role updated',
+    );
+
+    if (ok) onClose();
+  }
+
+  return (
+    <Dialog
+      open={member !== null}
+      onOpenChange={(open) => {
+        if (!open && !change.isPending) {
+          setRoleId('');
+          onClose();
+        }
+      }}
+      title={member ? `Change role for ${member.name}` : 'Change role'}
+      description="This replaces their current role. The list updates after the change succeeds."
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={change.isPending}>
+            Cancel
+          </Button>
+          <Button onClick={() => void confirm()} loading={change.isPending} disabled={!selected || roles.isPending}>
+            Update role
+          </Button>
+        </>
+      }
+    >
+      {roles.isError ? (
+        <p className="text-body text-danger">The role list could not be loaded.</p>
+      ) : (
+        <SelectField
+          label="Role"
+          value={selected}
+          onChange={(event) => setRoleId(event.target.value)}
+          hint={selectedRole?.description}
+          disabled={roles.isPending}
+        >
+          {(roles.data ?? []).map((role) => (
+            <option key={role.id} value={role.id}>
+              {humanize(role.name)}
+            </option>
+          ))}
+        </SelectField>
+      )}
+    </Dialog>
   );
 }
